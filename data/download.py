@@ -22,6 +22,9 @@ BLOCKED = 1000         # cost multiplier for edges to avoid unless there's no ot
 CLOSED_RECENT_DAYS = 30   # GT "Close" statuses older than this are stale (today's are from Sept 2025)
 # accessible routing only: GT's "not ADA compliant" is often stairs (62% has OSM stairs within 10 m), so it's avoided like stairs
 ACCESS_FACTOR = {"yes": 1, "unknown": 1.5, "no": BLOCKED, "steps": BLOCKED}
+# Paths checked on the ground as step-free, whatever OSM or GT's data says: OSM way id → what we found
+WEBER = "Weber SST entrance (2026-09-26): steps by the door, with a ramp just around the corner"
+CHECKED_STEP_FREE = {43674825: WEBER, 192993866: WEBER, 43674828: WEBER, 192993365: WEBER}
 
 
 def path(name):
@@ -201,6 +204,8 @@ def mapping(lights, sidewalks, callboxes):
     edges["access"], edges["closed"] = sidewalk_access(edges, sidewalks.to_crs(edges.crs))
     edges["stairs"] = osm_stairs(edges)
     edges.loc[edges["stairs"], "access"] = "steps"   # GT only rates the sidewalks it surveyed; OSM has most campus stairs
+    checked = edges["osmid"].map(lambda ids: any(i in CHECKED_STEP_FREE for i in (ids if isinstance(ids, list) else [ids])))
+    edges.loc[checked, "access"] = "yes"
 
     risk = W_DARK * (1 - edges["light"]) + W_NO_CALLBOX * (1 - edges["callbox"])
     closed = edges["closed"].map({True: BLOCKED, False: 1})
