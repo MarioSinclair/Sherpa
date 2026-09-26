@@ -206,9 +206,10 @@ def mapping(lights, sidewalks, callboxes):
     closed = edges["closed"].map({True: BLOCKED, False: 1})
     edges["cost"] = edges["length"] * (1 + risk) * closed                       # everyone
     edges["cost_access"] = edges["cost"] * edges["access"].map(ACCESS_FACTOR)   # ♿ accessible routing
+    edges["short_access"] = edges["length"] * closed * edges["access"].map(ACCESS_FACTOR)   # step-free, lighting not wanted
 
     attrs = edges.set_index(["u", "v", "key"])
-    for col in ["light", "callbox", "access", "closed", "stairs", "cost", "cost_access"]:
+    for col in ["light", "callbox", "access", "closed", "stairs", "cost", "cost_access", "short_access"]:
         nx.set_edge_attributes(G, attrs[col].to_dict(), col)
     return G
 

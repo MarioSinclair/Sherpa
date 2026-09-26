@@ -187,8 +187,8 @@ def attach(x, y, kind, avoid, added):
         G.add_node(a, x=p.x, y=p.y)
         for s, t, piece in ((u, a, substring(line, 0, at)), (a, v, substring(line, at, line.length))):
             share = piece.length / line.length
-            part = {**d, "geometry": piece, "length": d["length"] * share,
-                    "cost": d["cost"] * share, "cost_access": d["cost_access"] * share}
+            part = {**d, "geometry": piece, "length": d["length"] * share, "cost": d["cost"] * share,
+                    "cost_access": d["cost_access"] * share, "short_access": d["short_access"] * share}
             add(s, t, part)
             add(t, s, {**part, "geometry": piece.reverse()})
 
@@ -202,7 +202,8 @@ def attach(x, y, kind, avoid, added):
     access = "yes" if kind == "step-free" else d["access"]
     per_m = d["cost"] / max(d["length"], 1) / (BLOCKED if d["closed"] else 1)   # the path's light and call boxes, not its closure
     G.add_edge(a, door, **{**d, "geometry": LineString([(ax, ay), (x, y)]), "length": gap, "name": None, "access": access,
-                           "closed": False, "cost": gap * per_m, "cost_access": gap * per_m * ACCESS_FACTOR[access]})
+                           "closed": False, "cost": gap * per_m, "cost_access": gap * per_m * ACCESS_FACTOR[access],
+                           "short_access": gap * ACCESS_FACTOR[access]})
     return door
 
 
@@ -545,6 +546,7 @@ def route():
     if not signed_in():
         return jsonify(error="Please sign in"), 401
     accessible = request.args.get("accessible") == "1"
+    lit = request.args.get("lit") != "0"   # prefer well-lit paths (the default); off = the shortest walk
     building = request.args.get("building")
     try:
         x1, y1 = parse_point(request.args["from"])
@@ -565,14 +567,18 @@ def route():
     with route_lock:
         added = []
         try:
-            return plan_walks(orig, targets, accessible, set(parse_avoid(request.args.get("avoid"))), added, building)
+            return plan_walks(orig, targets, accessible, lit, set(parse_avoid(request.args.get("avoid"))), added, building)
         finally:
             G.remove_nodes_from(added)
 
 
-def plan_walks(orig, targets, accessible, avoid, added, building):
+# the main route follows what they chose: well lit and/or step-free, or else just the shortest walk
+MAIN_WEIGHT = {(True, True): "cost_access", (True, False): "short_access", (False, True): "cost", (False, False): "length"}
+
+
+def plan_walks(orig, targets, accessible, lit, avoid, added, building):
     """The safest and shortest walks (plus the step-free one and a bus trip when they apply) to the best door."""
-    weight = "cost_access" if accessible else "cost"   # the main route: step-free in accessible mode, otherwise safest
+    weight = MAIN_WEIGHT[(accessible, lit)]
     speed = ACCESSIBLE_SPEED if accessible else WALK_SPEED
 
     doors = {}

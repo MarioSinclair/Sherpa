@@ -53,6 +53,7 @@ let routing = false;
 let voiceOn = true;
 
 let accessible = false;                        // route around stairs and non-compliant sidewalks
+let lit = true;                                // prefer well-lit paths (on by default); off = just the shortest walk
 const walkSpeed = () => (accessible ? ACCESSIBLE_SPEED : WALK_SPEED);
 const layerOn = { lights: false, buses: false, callboxes: false, ada: false };
 const LAYER_IDS = { lights: ["lights-glow", "lights"], buses: ["bus-routes", "bus-stops"], callboxes: ["callboxes"], ada: ["ada"] };
@@ -246,6 +247,7 @@ $("chip-buses").addEventListener("click", () => toggleLayer("buses"));
 $("chip-callboxes").addEventListener("click", () => toggleLayer("callboxes"));
 $("chip-ada").addEventListener("click", () => toggleLayer("ada"));
 $("chip-access").addEventListener("click", () => setAccessible(!accessible));
+$("chip-lit").addEventListener("click", () => setLit(!lit));
 
 function toggleLayer(id, on = !layerOn[id]) {
     layerOn[id] = on;
@@ -321,6 +323,14 @@ function setAccessible(on) {
     mapReady.then(() => ["sidewalk-issues", "osm-stairs"].forEach((id) => map.setLayoutProperty(id, "visibility", on ? "visible" : "none")));
 
     // re-plan the route on screen for the new mode
+    if (mode === "preview") getRoute(tripStart(), target);
+}
+
+// Well-lit route (on by default): off means the shortest walk, or the shortest step-free one in accessible mode
+function setLit(on) {
+    if (routing) return;
+    lit = on;
+    $("chip-lit").setAttribute("aria-pressed", on);
     if (mode === "preview") getRoute(tripStart(), target);
 }
 
@@ -535,21 +545,21 @@ async function getRoute(from, to, { reroute = false } = {}) {
     routing = true;
     try {
         const where = to.building ? `building=${encodeURIComponent(to.building)}` : `to=${to.lat},${to.lng}${to.exact ? "&exact=1" : ""}`;
-        const res = await api(`/route?from=${from.lat},${from.lng}&${where}&accessible=${accessible ? 1 : 0}&avoid=${avoidParam()}`);
+        const res = await api(`/route?from=${from.lat},${from.lng}&${where}&accessible=${accessible ? 1 : 0}&lit=${lit ? 1 : 0}&avoid=${avoidParam()}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         if (!target) return;   // user cancelled while we were waiting
         await mapReady;
 
         routes = data;
-        const main = data.access ?? data.safe;   // the step-free route in accessible mode, otherwise the safest
+        const main = data[mainOption(data)];
         setSource("safe", data.safe.geojson);
         setSource("access", data.access ? data.access.geojson : EMPTY);
         setSource("walked", EMPTY);
         map.setFilter("callboxes-route", routeCallboxes(main.callboxes));
 
         if (reroute) {
-            showOnly(data.access ? "access" : "safe");   // reroutes follow the step-free or safest walk
+            showOnly(mainOption(data));   // reroutes follow the kind of route they chose
             startNav(main);
             speak("Rerouting");
             return;
@@ -623,10 +633,13 @@ function optionOrder(data, same) {
     return order.filter((o) => o === "bus" || (!lengths.has(data[o].length_m) && lengths.add(data[o].length_m)));
 }
 
+// The route that follows their choices: step-free (accessible), else the safest (well lit), else the shortest
+const mainOption = (data) => (data.access ? "access" : lit ? "safe" : "shortest");
+
 // What was asked for: "fastest" is whichever of the shortest walk and the bus arrives first
 function preferredOption(data, same) {
     if (preferred === "bus" && data.bus) return "bus";
-    if (preferred !== "fastest") return "safe";
+    if (preferred !== "fastest") return lit ? "safe" : "shortest";
     if (data.bus && data.bus.total_s < data.shortest.length_m / walkSpeed()) return "bus";
     return same ? "safe" : "shortest";
 }
