@@ -341,7 +341,7 @@ if (!reduced) {
       const cr = heroCtas.getBoundingClientRect();
       anchors[0] = {
         x: Math.max(24, (cr.left - sceneRect.left) - 10),
-        y: Math.min(h - 24, (cr.bottom - sceneRect.top) + 48)
+        y: Math.min(h - 24, (cr.bottom - sceneRect.top) + 74)
       };
     }
 
