@@ -178,6 +178,69 @@ button.chip[aria-pressed="true"] {
     font-weight: 600;
 }
 
+/* ---- Map layers: a row of chips on wide screens, a menu (top-bar button) on phones ---- */
+button.menu-toggle {
+    display: none;
+    margin-left: auto;
+    padding: 6px;
+    background: none;
+    color: white;
+}
+
+button.menu-toggle .ico {
+    width: 26px;
+    height: 26px;
+}
+
+@media (max-width: 699px) {
+    button.menu-toggle {
+        display: inline-flex;
+    }
+
+    #chips {
+        display: none;
+    }
+
+    body[data-menu="open"] #chips {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        margin: 0;
+        padding: 6px 0;
+        overflow: visible;
+        border-radius: 12px;
+        background: white;
+        box-shadow: var(--shadow);
+    }
+
+    body[data-menu="open"] button.chip {
+        justify-content: flex-start;
+        gap: 12px;
+        min-height: 48px;
+        padding: 10px 16px;
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+        color: var(--text);
+        font-size: 1rem;
+        font-weight: normal;
+    }
+
+    /* an on/off switch at the end of each row */
+    body[data-menu="open"] button.chip::after {
+        content: "";
+        margin-left: auto;
+        width: 40px;
+        height: 22px;
+        border-radius: 999px;
+        background: radial-gradient(circle at 11px 50%, white 8px, transparent 9px) #dadce0;
+    }
+
+    body[data-menu="open"] button.chip[aria-pressed="true"]::after {
+        background: radial-gradient(circle at 29px 50%, white 8px, transparent 9px) #1a73e8;
+    }
+}
+
 /* map-symbol keys: match the circle / line colours in script.js */
 .key {
     width: 10px;

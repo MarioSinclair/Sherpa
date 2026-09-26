@@ -63,6 +63,7 @@ const busMarkers = new Map();
 function setMode(next) {
     mode = next;
     document.body.dataset.mode = next;
+    setMenu(false);
     $("recenter").hidden = true;
 }
 
@@ -240,6 +241,14 @@ function toggleLayer(id, on = !layerOn[id]) {
     if (mode === "idle" && !start) statusEl.textContent = idleHint();
 }
 
+// ---- Layers menu (phones): the layer switches fold into a menu button in the top bar ----
+$("menu-toggle").addEventListener("click", () => setMenu(document.body.dataset.menu !== "open"));
+
+function setMenu(open) {
+    document.body.dataset.menu = open ? "open" : "closed";
+    $("menu-toggle").setAttribute("aria-expanded", open);
+}
+
 // ---- Live buses ----
 // Shown when the Buses chip is on, or while a bus trip is on screen. Refreshed every 30 s.
 const busesWanted = () => layerOn.buses || (routes?.bus && (mode === "preview" || (mode === "nav" && selected === "bus")));
@@ -347,6 +356,7 @@ function onFixError(err) {
 // ---- Tapping the map ----
 map.on("click", (e) => {
     if (placing) return;   // dragging a report pin
+    if (document.body.dataset.menu === "open") return setMenu(false);   // a tap on the map just closes the layers menu
     const box = [[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]];
     const tapped = (ids) => map.queryRenderedFeatures(box, { layers: ids.filter((id) => map.getLayer(id)) })[0];
 
@@ -445,6 +455,7 @@ function searchBuildings(text) {
 }
 
 searchInput.addEventListener("input", () => showSuggestions(searchBuildings(searchInput.value)));
+searchInput.addEventListener("focus", () => setMenu(false));
 
 function showSuggestions(names) {
     suggestionsEl.replaceChildren(...names.map((name) => {
