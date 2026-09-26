@@ -878,42 +878,95 @@ async function api(url, options = {}) {
 }
 
 const signinError = (text) => ($("signin-error").textContent = text);
+const signinEmail = () => $("email").value.trim().toLowerCase();
+let creating = false;   // "Create account" instead of "Sign in"
 
 function showSigninStep(step) {
-    $("signin-email").hidden = step !== "email";
+    $("signin-form").hidden = step !== "form";
     $("signin-code").hidden = step !== "code";
 }
 
-$("signin-email").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = $("email").value.trim().toLowerCase();
-    if (!email.endsWith(".edu")) return signinError("Please use your campus (.edu) email");
-    signinError("");
-    const button = e.target.querySelector("[type=submit]");
-    button.disabled = true;
-    const { error } = await sb.auth.signInWithOtp({ email });
-    button.disabled = false;
-    if (error) return signinError(error.message);
-    $("signin-sent-to").textContent = email;
+function askForCode(note) {
+    $("signin-code-note").textContent = note;
     showSigninStep("code");
     $("code").focus();
+}
+
+// Runs one sign-in step with its button disabled, showing any error
+async function signinStep(button, action) {
+    signinError("");
+    button.disabled = true;
+    try {
+        await action();
+    } catch (err) {
+        signinError(err.message);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+$("signin-switch").addEventListener("click", () => {
+    creating = !creating;
+    $("signin-submit").textContent = creating ? "Create account" : "Sign in";
+    $("signin-switch").textContent = creating ? "Have an account? Sign in" : "New here? Create an account";
+    $("password").autocomplete = creating ? "new-password" : "current-password";
+    $("password").minLength = creating ? 8 : 6;
+    signinError("");
 });
 
-$("signin-code").addEventListener("submit", async (e) => {
+$("signin-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    const button = e.target.querySelector("[type=submit]");
-    button.disabled = true;
-    const { error } = await sb.auth.verifyOtp({ email: $("email").value.trim().toLowerCase(), token: $("code").value.trim(), type: "email" });
-    button.disabled = false;
-    if (error) return signinError(error.message);
-    signinError("");   // the sign-in listener hides the screen; reset it for next time
-    $("code").value = "";
-    showSigninStep("email");
+    const email = signinEmail();
+    const password = $("password").value;
+    if (!email.endsWith(".edu")) return signinError("Please use your campus (.edu) email");
+    signinStep($("signin-submit"), async () => {
+        if (creating) {
+            const { data, error } = await sb.auth.signUp({ email, password });
+            if (error) throw error;
+            if (data.user?.identities?.length === 0) throw new Error("That email already has an account. Sign in instead.");
+            if (data.session) return;   // email confirmation is off in Supabase: signed in straight away
+            return askForCode(`We emailed a code to ${email} to check it's yours. You only need to do this once.`);
+        }
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error?.code === "email_not_confirmed") {   // made an account but never entered the code
+            await sb.auth.resend({ type: "signup", email });
+            return askForCode(`Your email isn't confirmed yet. We sent a new code to ${email}.`);
+        }
+        if (error?.code === "invalid_credentials") throw new Error("Wrong email or password");
+        if (error) throw error;
+    });
+});
+
+// Forgot your password: sign in with an emailed code instead (existing accounts only)
+$("signin-with-code").addEventListener("click", () => {
+    const email = signinEmail();
+    if (!email.endsWith(".edu")) return signinError("Type your campus (.edu) email first");
+    signinStep($("signin-with-code"), async () => {
+        const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+        if (error?.code === "otp_disabled") throw new Error("No account with that email yet. Create one first.");
+        if (error) throw error;
+        askForCode(`We emailed a sign-in code to ${email}.`);
+    });
+});
+
+$("signin-code").addEventListener("submit", (e) => {
+    e.preventDefault();
+    signinStep(e.target.querySelector("[type=submit]"), async () => {
+        const email = signinEmail();
+        const token = $("code").value.trim();
+        // a code from "Forgot your password" is an email code; one from a new account is a sign-up code
+        let { error } = await sb.auth.verifyOtp({ email, token, type: "email" });
+        if (error) ({ error } = await sb.auth.verifyOtp({ email, token, type: "signup" }));
+        if (error) throw error;
+        $("code").value = "";   // the sign-in listener hides the screen; reset it for next time
+        $("password").value = "";
+        showSigninStep("form");
+    });
 });
 
 $("signin-back").addEventListener("click", () => {
     signinError("");
-    showSigninStep("email");
+    showSigninStep("form");
 });
 
 // ---- Safety: "I feel unsafe" and GTPD ----

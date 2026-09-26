@@ -186,21 +186,24 @@
 
     <div id="toast" role="status" hidden></div>
 
-    <!-- Sign-in: campus email, then the code emailed to it -->
+    <!-- Sign-in: campus email and password. A new account confirms its email once, with an emailed code. -->
     <section id="signin" hidden>
         <div class="signin-card">
             <h1>Sherpa</h1>
             <p>Safer, accessible walking routes around campus. Sign in with your campus email.</p>
             <p class="credit">Named in honor of the Sherpa people of eastern Nepal, renowned for guiding climbers through the Himalaya.</p>
-            <form id="signin-email">
+            <form id="signin-form">
                 <label>Campus email <input id="email" type="email" required autocomplete="email" placeholder="you@school.edu"></label>
-                <button type="submit" class="primary">Email me a code</button>
+                <label>Password <input id="password" type="password" required minlength="6" autocomplete="current-password"></label>
+                <button id="signin-submit" type="submit" class="primary">Sign in</button>
+                <button id="signin-switch" type="button" class="link">New here? Create an account</button>
+                <button id="signin-with-code" type="button" class="link">Forgot your password? Email me a code</button>
             </form>
             <form id="signin-code" hidden>
-                <p>We sent a code to <strong id="signin-sent-to"></strong>.</p>
+                <p id="signin-code-note"></p>
                 <label>Code <input id="code" required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}"></label>
-                <button type="submit" class="primary">Sign in</button>
-                <button id="signin-back" type="button" class="link">Use a different email</button>
+                <button type="submit" class="primary">Continue</button>
+                <button id="signin-back" type="button" class="link">Back</button>
             </form>
             <p id="signin-error" class="error" role="alert"></p>
         </div>
