@@ -1,4 +1,5 @@
 import os
+import time
 
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 ARCGIS = "https://services5.arcgis.com/7WaXTZEsI88qiQGw/arcgis/rest/services"
@@ -18,6 +19,7 @@ W_NO_CALLBOX = 1       # ...plus up to 1x more with no call box nearby
 CALLBOX_FULL_M = 75    # call box within this distance → full credit
 CALLBOX_NONE_M = 250   # farther than this → no credit
 BLOCKED = 1000         # cost multiplier for edges to avoid unless there's no other way
+CLOSED_RECENT_DAYS = 30   # GT "Close" statuses older than this are stale (today's are from Sept 2025)
 ACCESS_FACTOR = {"yes": 1, "unknown": 1.5, "no": 4, "steps": BLOCKED}   # accessible routing only
 
 
@@ -149,7 +151,7 @@ def sidewalk_access(edges, sidewalks, spacing=5, max_dist=10, max_angle=30):
                                geometry=shapely.line_interpolate_point(geoms[edge_i], at), crs=edges.crs)
 
     # nearest sidewalk to each sample, kept only if it runs the same way (either direction)
-    sw = sidewalks[["ADACOMPLY", "Status", "geometry"]].explode(index_parts=False).reset_index(drop=True)
+    sw = sidewalks[["ADACOMPLY", "Status", "EditDate", "geometry"]].explode(index_parts=False).reset_index(drop=True)
     near = gpd.sjoin_nearest(samples, sw, max_distance=max_dist)
     near = near[~near.index.duplicated()]
     lines = np.asarray(sw.geometry.values)[near["index_right"].to_numpy()]
@@ -162,7 +164,8 @@ def sidewalk_access(edges, sidewalks, spacing=5, max_dist=10, max_angle=30):
     frac = (pd.crosstab(near["edge"], cls)
             .reindex(index=edges.index, columns=["yes", "no", "steps"], fill_value=0)
             .div(per_edge, axis=0))
-    closed = (near["Status"] == "Close").groupby(near["edge"]).sum().reindex(edges.index, fill_value=0) / per_edge
+    recent = near["EditDate"] >= (time.time() - CLOSED_RECENT_DAYS * 86400) * 1000   # EditDate is epoch ms
+    closed = ((near["Status"] == "Close") & recent).groupby(near["edge"]).sum().reindex(edges.index, fill_value=0) / per_edge
 
     # any real stretch of stairs or non-compliant sidewalk flags the whole edge
     access = np.select([frac["steps"] >= 0.3, frac["no"] >= 0.3, frac["yes"] >= 0.5], ["steps", "no", "yes"], "unknown")

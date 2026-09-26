@@ -81,6 +81,8 @@ function idleHint() {
 const EMPTY = { type: "FeatureCollection", features: [] };
 // route colour by light: 0 = dark (red) → 1 = well lit (green)
 const LIGHT_COLOR = ["interpolate", ["linear"], ["get", "light"], 0, "#d93025", 0.5, "#f9ab00", 1, "#2e9d4f"];
+// GT "Close" statuses edited longer ago than this are stale and ignored, as in data/download.py
+const CLOSED_RECENT_DAYS = 30;
 
 mapReady.then(() => {
     // draw routes above the 3D buildings (so they aren't hidden when tilted) but under the labels
@@ -134,14 +136,16 @@ mapReady.then(() => {
     }, firstLabel);
 
     // Sidewalk problems, shown in accessible mode: stairs, not ADA compliant, closed
+    const closedNow = ["all", ["==", ["get", "Status"], "Close"],
+        [">=", ["to-number", ["get", "EditDate"]], Date.now() - CLOSED_RECENT_DAYS * 86400000]];
     map.addLayer({
         id: "sidewalk-issues", type: "line", source: "sidewalks", layout: { ...line, visibility: "none" },
-        filter: ["any", ["in", ["get", "ADACOMPLY"], ["literal", ["No", "Steps"]]], ["==", ["get", "Status"], "Close"]],
+        filter: ["any", ["in", ["get", "ADACOMPLY"], ["literal", ["No", "Steps"]]], closedNow],
         paint: {
             "line-width": 4,
             "line-opacity": 0.85,
             "line-color": ["case",
-                ["==", ["get", "Status"], "Close"], "#3c4043",
+                closedNow, "#3c4043",
                 ["==", ["get", "ADACOMPLY"], "Steps"], "#d93025",
                 "#f29900"],
         },
