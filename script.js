@@ -102,6 +102,7 @@ mapReady.then(() => {
     // GT Facilities data, served straight from data/
     map.addSource("lights", { type: "geojson", data: EMPTY });   // filled when the Lights chip is first turned on
     map.addSource("sidewalks", { type: "geojson", data: "/data/gt_sidewalks.geojson" });
+    map.addSource("osm-stairs", { type: "geojson", data: "/stairs" });   // stairs GT's sidewalk data doesn't have
     map.addSource("callboxes", { type: "geojson", data: "/data/gt_callboxes.geojson" });
     map.addSource("ada", { type: "geojson", data: "/data/gt_ada_entrances.geojson" });
 
@@ -158,6 +159,10 @@ mapReady.then(() => {
                 ["==", ["get", "ADACOMPLY"], "Steps"], "#B3261E",
                 "#E8A33D"],
         },
+    }, firstLabel);
+    map.addLayer({
+        id: "osm-stairs", type: "line", source: "osm-stairs", layout: { ...line, visibility: "none" },
+        paint: { "line-width": 4, "line-opacity": 0.85, "line-color": "#B3261E" },
     }, firstLabel);
 
     map.addLayer({
@@ -313,7 +318,7 @@ function setAccessible(on) {
     document.body.dataset.accessible = on;
     $("chip-access").setAttribute("aria-pressed", on);
     toggleLayer("ada", on);   // entrances come with accessible mode
-    mapReady.then(() => map.setLayoutProperty("sidewalk-issues", "visibility", on ? "visible" : "none"));
+    mapReady.then(() => ["sidewalk-issues", "osm-stairs"].forEach((id) => map.setLayoutProperty(id, "visibility", on ? "visible" : "none")));
 
     // re-plan the route on screen for the new mode
     if (mode === "preview") getRoute(tripStart(), target);

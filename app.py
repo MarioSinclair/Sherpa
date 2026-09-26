@@ -35,9 +35,12 @@ to_wgs84 = Transformer.from_crs(G.graph["crs"], "EPSG:4326", always_xy=True)
 print(G.number_of_edges(), "edges ready")
 buildings = load_buildings()   # name → other names, doors and footprint: for search, the AI and door-to-door routes
 footprints = gpd.GeoSeries([b["outline"] for b in buildings.values()], index=list(buildings), crs=4326).dropna().to_crs(G.graph["crs"])
-edge_lines = ox.graph_to_gdfs(G, nodes=False)[["geometry"]]   # for finding the paths near reported spots and doors
+all_edges = ox.graph_to_gdfs(G, nodes=False)
+edge_lines = all_edges[["geometry"]]   # for finding the paths near reported spots and doors
+level_lines = edge_lines[~all_edges["stairs"].astype(bool)]   # step-free doors join the nearest path that isn't stairs
+stairs_geojson = all_edges.loc[all_edges["stairs"].astype(bool), ["geometry"]].to_crs(4326).__geo_interface__   # OSM stairs, for the map
 graph_nodes = ox.graph_to_gdfs(G, edges=False)[["geometry"]]  # the real nodes (routes add temporary ones for doors)
-footprints.sindex, edge_lines.sindex, graph_nodes.sindex   # build the spatial indexes now, not on the first request
+footprints.sindex, edge_lines.sindex, level_lines.sindex, graph_nodes.sindex   # build the spatial indexes now, not on the first request
 
 
 bus_routes = buses.Routes(to_graph, to_wgs84)
@@ -127,12 +130,13 @@ def attach(x, y, kind, avoid, added):
     The path is split where the door's walkway meets it (the original edge stays, so nothing else changes).
     New nodes go in `added` for removal after the request; pieces of reported paths join `avoid`.
     """
-    hit = edge_lines.sindex.nearest(Point(x, y), max_distance=MAX_SNAP_M if kind == "point" else DOOR_SNAP_M, return_all=False)[1]
+    lines = level_lines if kind == "step-free" else edge_lines
+    hit = lines.sindex.nearest(Point(x, y), max_distance=MAX_SNAP_M if kind == "point" else DOOR_SNAP_M, return_all=False)[1]
     if not len(hit):
         return None
-    u, v, k = edge_lines.index[hit[0]]
+    u, v, k = lines.index[hit[0]]
     d = G.edges[u, v, k]
-    line = edge_lines.geometry.iloc[hit[0]]
+    line = lines.geometry.iloc[hit[0]]
     ux, uy = G.nodes[u]["x"], G.nodes[u]["y"]
     if math.dist(line.coords[-1], (ux, uy)) < math.dist(line.coords[0], (ux, uy)):   # stored backwards
         line = line.reverse()
@@ -472,6 +476,12 @@ def bus_vehicles():
         "lng": v["Longitude"],
         "heading": v["Heading"],
     } for v in buses.vehicles()])
+
+
+@app.get("/stairs")
+def stairs_map():
+    """OpenStreetMap stairs, drawn in accessible mode alongside GT's own sidewalk problems."""
+    return jsonify(stairs_geojson)
 
 
 @app.get("/buildings")

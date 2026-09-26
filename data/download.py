@@ -191,12 +191,16 @@ def mapping(lights, sidewalks, callboxes):
     # osmnx's walk network leaves out every cycleway, but most campus ones are shared paths marked for walking
     # too (foot=designated), like the path down Clough's west side and Skiles Walkway: add those back
     walk = [ox._overpass._get_network_filter("walk"), '["highway"="cycleway"]["foot"!~"no"]']
-    G = ox.project_graph(ox.graph_from_bbox((w, s, e, n), network_type="walk", custom_filter=walk))
+    ox.settings.useful_tags_way = sorted({*ox.settings.useful_tags_way, "ramp", "ramp:wheelchair"})   # stairs with a ramp
+    G = ox.graph_from_bbox((w, s, e, n), network_type="walk", custom_filter=walk, simplify=False)
+    G = ox.project_graph(ox.simplify_graph(G, edge_attrs_differ=["highway"]))   # stairs stay separate from the paths they join
     edges = ox.graph_to_gdfs(G, nodes=False).reset_index()
 
     edges["light"] = light_score(edges, lights.to_crs(edges.crs))
     edges["callbox"] = callbox_score(edges, callboxes.to_crs(edges.crs))
     edges["access"], edges["closed"] = sidewalk_access(edges, sidewalks.to_crs(edges.crs))
+    edges["stairs"] = osm_stairs(edges)
+    edges.loc[edges["stairs"], "access"] = "steps"   # GT only rates the sidewalks it surveyed; OSM has most campus stairs
 
     risk = W_DARK * (1 - edges["light"]) + W_NO_CALLBOX * (1 - edges["callbox"])
     closed = edges["closed"].map({True: BLOCKED, False: 1})
@@ -204,9 +208,21 @@ def mapping(lights, sidewalks, callboxes):
     edges["cost_access"] = edges["cost"] * edges["access"].map(ACCESS_FACTOR)   # ♿ accessible routing
 
     attrs = edges.set_index(["u", "v", "key"])
-    for col in ["light", "callbox", "access", "closed", "cost", "cost_access"]:
+    for col in ["light", "callbox", "access", "closed", "stairs", "cost", "cost_access"]:
         nx.set_edge_attributes(G, attrs[col].to_dict(), col)
     return G
+
+
+def osm_stairs(edges):
+    """OpenStreetMap staircases, except ones OSM says have a ramp."""
+    import pandas as pd
+
+    def has(value, wanted):   # merged paths hold a list of values
+        return wanted in (value if isinstance(value, list) else [value])
+
+    none = pd.Series(None, index=edges.index)
+    ramp = [has(r, "yes") or has(rw, "yes") for r, rw in zip(edges.get("ramp", none), edges.get("ramp:wheelchair", none))]
+    return edges["highway"].map(lambda h: has(h, "steps")) & ~pd.Series(ramp, index=edges.index)
 
 
 def light_score(edges, lights):
