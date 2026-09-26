@@ -113,21 +113,31 @@ def download_buildings():
     walls = b.to_crs(utm)
     places = {name: {"aka": set(), "doors": [], "nums": nums} for name, nums in zip(b["name"], b["num"])}
 
-    # GT's ADA entrances, matched by the building number they start with ("153 - ADA Building Entrance - Klaus")
+    # GT's ADA entrances go to the building they're at. Their building numbers ("153 - ADA Building Entrance - Klaus")
+    # are sometimes wrong ("17 - Campus Recreation Center" is the stadium's number), so a number only picks between
+    # buildings the door is near, or places a door with no footprint nearby
     ada = gpd.read_file(path("ada_entrances"))
     ada = ada[["entrance" in f"{text(n)} {text(d)}".lower() for n, d in zip(ada["Name"], ada["Description"])]]   # not stairs or notes
-    by_num = {n: name for name, p in places.items() for n in p["nums"]}
-    near = gpd.sjoin_nearest(ada.to_crs(utm)[["geometry"]], walls[["name", "geometry"]], max_distance=ADA_NEAR_M, how="left")
-    near = near[~near.index.duplicated()]["name"]
-    for i, n, d, point in zip(ada.index, ada["Name"], ada["Description"], ada.geometry):
+    by_num = {}
+    for name, p in places.items():
+        for n in p["nums"]:
+            by_num.setdefault(n, []).append(name)   # a few numbers are shared ("160": the CRC and ORGT)
+    names = set(places)
+    for n, d, point, at in zip(ada["Name"], ada["Description"], ada.geometry, ada.to_crs(utm).geometry):
         own = entrance_building(n, d)
         num = re.match(r"\s*(\d+[A-Z]?)\b", text(d) or text(n))
-        name = by_num.get(num and number(num.group(1))) or (near[i] if isinstance(near[i], str) else None) or own
+        numbered = by_num.get(num and number(num.group(1)), [])
+        close = walls.assign(dist=walls.distance(at)).query("dist <= @ADA_NEAR_M").sort_values("dist")
+        if len(close):   # the nearby building the entrance names, else the one its number says, else the nearest
+            named = close[[b.lower() in text(own).lower() for b in close["name"]]]
+            name = (named["name"].tolist() or close[close["name"].isin(numbered)]["name"].tolist() or close["name"].tolist())[0]
+        else:
+            name = (numbered[:1] or [own])[0]
         if not name:
             continue
         place = places.setdefault(name, {"aka": set(), "doors": [], "nums": []})   # no footprint: just its doors
         place["doors"].append([round(point.x, 6), round(point.y, 6), True])
-        if own and own != name:
+        if own and own != name and own not in names:
             place["aka"].add(own)   # keeps "Klaus Advanced Computing" findable as well as "Klaus Building"
 
     # OpenStreetMap entrances on a footprint's wall (not exit-only doors); wheelchair=yes counts as step-free
