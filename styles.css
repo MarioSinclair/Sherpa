@@ -531,11 +531,6 @@ a.button.danger {
     display: none;
 }
 
-a.button.signin-gtpd {
-    display: flex;
-    margin-top: 20px;
-}
-
 /* ---- You-are-here marker ---- */
 .you {
     width: 22px;
