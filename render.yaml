@@ -1,0 +1,26 @@
+# Render Blueprint: dashboard → New → Blueprint → pick the Waypoint repo.
+# Render redeploys every time main changes.
+# Secrets (sync: false) are typed into the dashboard, never committed.
+services:
+  - type: web
+    name: waypoint
+    runtime: python
+    plan: free           # sleeps after 15 min without visitors; the next visit takes about a minute to wake it
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    # one worker: the scored campus graph takes ~320 MB and the free plan has 512 MB
+    startCommand: gunicorn app:app --workers 1 --threads 4 --timeout 180 --bind 0.0.0.0:$PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.11
+      - key: PYTHONUNBUFFERED    # show print() output in Render's logs straight away
+        value: "1"
+      - key: AI_PROVIDER
+        value: muse
+      - key: META_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        value: https://bapuagpueylikfqlxcpk.supabase.co
+      - key: SUPABASE_KEY        # the publishable key: safe to share, the database rules protect the data
+        value: sb_publishable_5Htu_tlSNKE1NPW2Y_zuYg_ZBHQwmUC
