@@ -1,0 +1,13 @@
+<!--
+  Supabase → Authentication → Emails → Templates → "Confirm signup"
+  Subject: Confirm your Sherpa account
+  Plain on purpose: no links or images, one short message, a clear reason for the email. Spam filters like that.
+-->
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.5; color: #1f2328; max-width: 480px;">
+  <p>Hi,</p>
+  <p>Thanks for creating a Sherpa account. To confirm this is your email address, type this code into the app:</p>
+  <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px; margin: 16px 0;">{{ .Token }}</p>
+  <p>You only need to do this once. After that, you sign in with your email and password.</p>
+  <p>If you didn't sign up for Sherpa, you can ignore this email.</p>
+  <p>The Sherpa team</p>
+</div>

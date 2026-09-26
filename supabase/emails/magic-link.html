@@ -1,0 +1,12 @@
+<!--
+  Supabase → Authentication → Emails → Templates → "Magic Link"
+  Used for "Forgot your password? Email me a code".
+  Subject: Your Sherpa sign-in code
+-->
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.5; color: #1f2328; max-width: 480px;">
+  <p>Hi,</p>
+  <p>Here's the code you asked for to sign in to Sherpa:</p>
+  <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px; margin: 16px 0;">{{ .Token }}</p>
+  <p>If you didn't ask for this code, you can ignore this email. Your account stays safe.</p>
+  <p>The Sherpa team</p>
+</div>
