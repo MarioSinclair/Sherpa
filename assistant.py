@@ -1,6 +1,6 @@
 """Turns a typed request into route settings, with Claude (default) or Meta's Muse Spark.
 
-"take me to tech tower, I use a wheelchair" → {"destination": "Evans Administration", "mode": "safe", "accessible": true}
+"take me to tech tower, I use a wheelchair" → {"destination": "Lettie Pate Whithead Evans Administration", "mode": "safe", "accessible": true}
 
 Only used when plain building search finds nothing, so the search box still works without it.
 AI_PROVIDER picks the model: "claude" (default) or "muse". Keys come from ANTHROPIC_API_KEY / META_API_KEY
@@ -29,7 +29,7 @@ SCHEMA = {
 
 PROMPT = """You turn a Georgia Tech walking request into route settings for a campus safety app.
 
-- destination: the building they want to go to, copied exactly from the list below, or null if they don't name one on the list. If more than one building could match, pick the most likely one. Use campus nicknames you know: "Tech Tower" is Evans Administration, "the CULC" is Clough Undergraduate Learning Commons.
+- destination: the building they want to go to, copied exactly from the list below, or null if they don't name one on the list. If more than one building could match, pick the most likely one. Use campus nicknames you know: "Tech Tower" is Lettie Pate Whithead Evans Administration, "the CULC" is Clough Building.
 - mode: "bus" if they want the bus or to walk as little as possible, "fastest" if they're in a hurry or want the quickest way, otherwise "safe".
 - accessible: true if they mention a wheelchair, crutches, another mobility aid, avoiding stairs or steps, or needing an accessible route.
 
@@ -43,10 +43,14 @@ def key_name():
 
 
 def route_settings(text, buildings):
-    """{"destination": name or None, "mode": "safe" | "fastest" | "bus", "accessible": bool}; raises if the AI fails."""
+    """{"destination": name or None, "mode": "safe" | "fastest" | "bus", "accessible": bool}; raises if the AI fails.
+
+    buildings maps each building's name to the other names it goes by.
+    """
     ask = _muse if os.environ.get("AI_PROVIDER", "claude") == "muse" else _claude
-    out = ask(PROMPT + "\n".join(buildings), text[:MAX_CHARS])
-    exact = {name.lower(): name for name in buildings}
+    listing = "\n".join(f"{name} (also {', '.join(aka)})" if aka else name for name, aka in buildings.items())
+    out = ask(PROMPT + listing, text[:MAX_CHARS])
+    exact = {n.lower(): name for name, aka in buildings.items() for n in (name, *aka)}
     out["destination"] = exact.get((out["destination"] or "").strip().lower())   # only names we can route to
     return out
 

@@ -406,6 +406,7 @@ body[data-lights="true"] #legend > .lights-key {
     border-radius: 3px;
 }
 
+.access .swatch   { background: var(--lit); box-shadow: 0 0 0 2px #1a73e8; }
 .safe .swatch     { background: var(--lit); }
 .shortest .swatch { background: repeating-linear-gradient(var(--shortest) 0 6px, transparent 6px 10px); }
 
@@ -424,6 +425,11 @@ body[data-lights="true"] #legend > .lights-key {
 .tag.muted {
     background: #f1f3f4;
     color: var(--muted);
+}
+
+.tag.access-tag {
+    background: #e8f0fe;
+    color: #1a73e8;
 }
 
 .tag.bus-tag {

@@ -1,18 +1,23 @@
+import itertools
 import math
 import os
+import threading
 import time
 
+import geopandas as gpd
 import networkx as nx
+import numpy as np
 import osmnx as ox
 import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
+from shapely.ops import substring
 
 import buses
 import assistant
-from data.download import BLOCKED, building_names, load_layers, mapping
+from data.download import ACCESS_FACTOR, BLOCKED, load_buildings, load_layers, mapping
 
 load_dotenv()   # API keys from .env when running locally
 if not os.environ.get(assistant.key_name()):
@@ -28,9 +33,11 @@ callboxes = layers["callboxes"].to_crs(G.graph["crs"])
 to_graph = Transformer.from_crs("EPSG:4326", G.graph["crs"], always_xy=True)
 to_wgs84 = Transformer.from_crs(G.graph["crs"], "EPSG:4326", always_xy=True)
 print(G.number_of_edges(), "edges ready")
-buildings = building_names(layers["ada_entrances"])   # for the AI; the browser builds the same list for search
-edge_lines = ox.graph_to_gdfs(G, nodes=False)[["geometry"]]   # for finding the paths near reported spots
-edge_lines.sindex   # build the spatial index now, not on the first request
+buildings = load_buildings()   # name → other names, doors and footprint: for search, the AI and door-to-door routes
+footprints = gpd.GeoSeries([b["outline"] for b in buildings.values()], index=list(buildings), crs=4326).dropna().to_crs(G.graph["crs"])
+edge_lines = ox.graph_to_gdfs(G, nodes=False)[["geometry"]]   # for finding the paths near reported spots and doors
+graph_nodes = ox.graph_to_gdfs(G, edges=False)[["geometry"]]  # the real nodes (routes add temporary ones for doors)
+footprints.sindex, edge_lines.sindex, graph_nodes.sindex   # build the spatial indexes now, not on the first request
 
 
 bus_routes = buses.Routes(to_graph, to_wgs84)
@@ -80,6 +87,90 @@ def cost(weight, avoid):
 def parse_point(text):
     lat, lng = map(float, text.split(","))
     return to_graph.transform(lng, lat)          # (x, y) in the graph's projected CRS
+
+
+def nearest_nodes(xs, ys):
+    """The nearest real graph node to each (x, y), and how far away it is in metres."""
+    (i, hit), dist = graph_nodes.sindex.nearest(gpd.points_from_xy(xs, ys), return_all=False, return_distance=True)
+    order = np.argsort(i)
+    return graph_nodes.index[hit[order]].tolist(), dist[order].tolist()
+
+
+# ---- Destinations: routes end at a building's door ----
+DOOR_SNAP_M = 60        # doors farther than this from any path can't be walked to
+WALL_EVERY_M = 8        # a building with no known door: try a spot on its wall every 8 m
+route_lock = threading.Lock()       # door routes add temporary nodes to the shared graph, one request at a time
+new_ids = itertools.count(-1, -1)   # temporary node ids (OSM's are positive)
+
+
+def building_at(x, y):
+    """The building whose footprint holds (x, y), or None."""
+    hit = footprints.sindex.query(Point(x, y), predicate="intersects")
+    return footprints.index[hit[0]] if len(hit) else None
+
+
+def ends(building, accessible):
+    """Where a route to this building may end: [(x, y, kind)], kind "step-free", "door" or "wall" (no door on record)."""
+    doors = [(*to_graph.transform(lng, lat), "step-free" if free else "door") for lng, lat, free in buildings[building]["doors"]]
+    if accessible and any(kind == "step-free" for *_, kind in doors):
+        doors = [d for d in doors if d[2] == "step-free"]
+    if doors or building not in footprints.index:
+        return doors
+    shape = footprints[building]
+    rings = [p.exterior for p in getattr(shape, "geoms", [shape])]
+    return [(*ring.interpolate(d).coords[0], "wall") for ring in rings for d in np.arange(0, ring.length, WALL_EVERY_M)]
+
+
+def attach(x, y, kind, avoid, added):
+    """Add a node at (x, y), joined to the nearest point on the nearest path; None if no path is close enough.
+
+    The path is split where the door's walkway meets it (the original edge stays, so nothing else changes).
+    New nodes go in `added` for removal after the request; pieces of reported paths join `avoid`.
+    """
+    hit = edge_lines.sindex.nearest(Point(x, y), max_distance=MAX_SNAP_M if kind == "point" else DOOR_SNAP_M, return_all=False)[1]
+    if not len(hit):
+        return None
+    u, v, k = edge_lines.index[hit[0]]
+    d = G.edges[u, v, k]
+    line = edge_lines.geometry.iloc[hit[0]]
+    ux, uy = G.nodes[u]["x"], G.nodes[u]["y"]
+    if math.dist(line.coords[-1], (ux, uy)) < math.dist(line.coords[0], (ux, uy)):   # stored backwards
+        line = line.reverse()
+
+    def add(s, t, data):
+        key = G.add_edge(s, t, **data)
+        if (u, v, k) in avoid:
+            avoid.add((s, t, key))
+
+    at = line.project(Point(x, y))
+    if at < 1:
+        a = u
+    elif at > line.length - 1:
+        a = v
+    else:
+        a = next(new_ids)
+        added.append(a)
+        p = line.interpolate(at)
+        G.add_node(a, x=p.x, y=p.y)
+        for s, t, piece in ((u, a, substring(line, 0, at)), (a, v, substring(line, at, line.length))):
+            share = piece.length / line.length
+            part = {**d, "geometry": piece, "length": d["length"] * share,
+                    "cost": d["cost"] * share, "cost_access": d["cost_access"] * share}
+            add(s, t, part)
+            add(t, s, {**part, "geometry": piece.reverse()})
+
+    ax, ay = G.nodes[a]["x"], G.nodes[a]["y"]
+    gap = math.dist((ax, ay), (x, y))
+    if gap < 1:
+        return a
+    door = next(new_ids)
+    added.append(door)
+    G.add_node(door, x=x, y=y)
+    access = "yes" if kind == "step-free" else d["access"]
+    per_m = d["cost"] / max(d["length"], 1) / (BLOCKED if d["closed"] else 1)   # the path's light and call boxes, not its closure
+    G.add_edge(a, door, **{**d, "geometry": LineString([(ax, ay), (x, y)]), "length": gap, "name": None, "access": access,
+                           "closed": False, "cost": gap * per_m, "cost_access": gap * per_m * ACCESS_FACTOR[access]})
+    return door
 
 
 def oriented_coords(edges):
@@ -224,7 +315,7 @@ def nodes_for_stops(route):
     """Walking-graph node for each stop on a route (None for stops off the walking network)."""
     if route["id"] not in stop_nodes:
         xs, ys = zip(*(s["xy"] for s in route["stops"]))
-        nodes, dists = ox.distance.nearest_nodes(G, list(xs), list(ys), return_dist=True)
+        nodes, dists = nearest_nodes(xs, ys)
         stop_nodes[route["id"]] = [n if d <= STOP_SNAP_M else None for n, d in zip(nodes, dists)]
     return stop_nodes[route["id"]]
 
@@ -383,6 +474,12 @@ def bus_vehicles():
     } for v in buses.vehicles()])
 
 
+@app.get("/buildings")
+def building_list():
+    """Every building for search: [[name, [other names it goes by]], ...]."""
+    return jsonify([[name, b["aka"]] for name, b in buildings.items()])
+
+
 @app.post("/ask")
 def ask():
     """Typed request → route settings from the AI (the search box's fallback when no building name matches)."""
@@ -392,7 +489,7 @@ def ask():
     if not text:
         return jsonify(error="Type where you want to go"), 400
     try:
-        return jsonify(assistant.route_settings(text, buildings))
+        return jsonify(assistant.route_settings(text, {name: b["aka"] for name, b in buildings.items()}))
     except Exception as err:   # the AI is a bonus: building search works without it
         print("AI failed:", repr(err), flush=True)
         return jsonify(error="Couldn't understand that. Try a building name"), 502
@@ -402,35 +499,72 @@ def ask():
 def route():
     if not signed_in():
         return jsonify(error="Please sign in"), 401
-    try:
-        (x1, y1), (x2, y2) = parse_point(request.args["from"]), parse_point(request.args["to"])
-    except (KeyError, ValueError):
-        return jsonify(error="Use /route?from=lat,lng&to=lat,lng"), 400
-
-    (orig, dest), dists = ox.distance.nearest_nodes(G, [x1, x2], [y1, y2], return_dist=True)
-    if max(dists) > MAX_SNAP_M:
-        return jsonify(error="That point is too far from campus paths"), 400
-    if orig == dest:
-        return jsonify(error="Start and end are too close together"), 400
-
     accessible = request.args.get("accessible") == "1"
-    weight = "cost_access" if accessible else "cost"
+    building = request.args.get("building")
+    try:
+        x1, y1 = parse_point(request.args["from"])
+        if building is None:
+            x2, y2 = parse_point(request.args["to"])
+            if request.args.get("exact") != "1":   # a tap on an entrance (or a reroute) keeps that very spot
+                building = building_at(x2, y2)   # a tap inside a building goes to its door
+    except (KeyError, ValueError):
+        return jsonify(error="Use /route?from=lat,lng&to=lat,lng or &building=name"), 400
+    if building is not None and building not in buildings:
+        return jsonify(error=f"No building called {building}"), 400
+    targets = ends(building, accessible) if building else [(x2, y2, "point")]
+
+    (orig,), (gap,) = nearest_nodes([x1], [y1])
+    if gap > MAX_SNAP_M:
+        return jsonify(error="Your start point is too far from campus paths"), 400
+
+    with route_lock:
+        added = []
+        try:
+            return plan_walks(orig, targets, accessible, set(parse_avoid(request.args.get("avoid"))), added, building)
+        finally:
+            G.remove_nodes_from(added)
+
+
+def plan_walks(orig, targets, accessible, avoid, added, building):
+    """The safest and shortest walks (plus the step-free one and a bus trip when they apply) to the best door."""
+    weight = "cost_access" if accessible else "cost"   # the route the door is chosen for
     speed = ACCESSIBLE_SPEED if accessible else WALK_SPEED
 
-    avoid = parse_avoid(request.args.get("avoid"))
-    safe = ox.shortest_path(G, orig, dest, weight=cost(weight, avoid))
-    short = ox.shortest_path(G, orig, dest, weight=cost("length", avoid))
-    if safe is None:
-        return jsonify(error="No walking route between those points"), 404
+    doors = {}
+    for x, y, kind in targets:
+        node = attach(x, y, kind, avoid, added)
+        if node is not None:
+            doors.setdefault(node, (x, y, kind))
+    if not doors:
+        return jsonify(error="That point is too far from campus paths"), 400
 
-    safe_route = route_summary(safe, weight, avoid)
+    # the door the main route reaches most cheaply: route to a temporary node joined to every door at no cost
+    sink = next(new_ids)
+    G.add_node(sink, x=0, y=0)
+    G.add_edges_from((node, sink, {"length": 0, "cost": 0, "cost_access": 0}) for node in doors)
+    main = ox.shortest_path(G, orig, sink, weight=cost(weight, avoid))
+    G.remove_node(sink)
+    if main is None:
+        return jsonify(error="No walking route between those points"), 404
+    main.pop()
+    dest = main[-1]
+    if dest == orig:
+        return jsonify(error="You're already there"), 400
+
+    safe = main if weight == "cost" else ox.shortest_path(G, orig, dest, weight=cost("cost", avoid))
+    short = ox.shortest_path(G, orig, dest, weight=cost("length", avoid))
+    safe_route = route_summary(safe, "cost", avoid)
+    access_route = route_summary(main, "cost_access", avoid) if accessible else None
     try:
-        bus = plan_bus(orig, dest, weight, safe_route["length_m"], speed, avoid)
+        bus = plan_bus(orig, dest, weight, (access_route or safe_route)["length_m"], speed, avoid)
     except Exception as err:   # the bus feed is a bonus: never let it break walking directions
         print("bus planning skipped:", repr(err))
         bus = None
 
-    return jsonify(safe=safe_route, shortest=route_summary(short, "length", avoid), bus=bus, accessible=accessible)
+    x, y, kind = doors[dest]
+    lat, lng = to_latlng((x, y))
+    return jsonify(safe=safe_route, shortest=route_summary(short, "length", avoid), access=access_route, bus=bus,
+                   accessible=accessible, building=building, door={"lat": lat, "lng": lng, "kind": kind})
 
 
 if __name__ == "__main__":

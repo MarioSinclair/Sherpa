@@ -36,9 +36,12 @@ let youMarker = null;
 
 let start = null;         // manual start marker, only used without GPS
 let dest = null;          // destination marker
-let destName = null;      // building name when the destination is an ADA entrance
+let destName = null;      // the building (or tapped entrance) being walked to
+let target = null;        // what was asked for: { building } or { lat, lng }; the server picks the door
+let doorKind = null;      // where the route ends: "step-free" or "door" (an entrance), "wall" (no door on record), "point"
 let routes = null;        // last /route response
-let selected = "safe";    // which option in the preview card: "safe", "shortest" or "bus"
+let selected = "safe";    // which option in the preview card: "access", "safe", "shortest" or "bus"
+let shown = [];           // the options in the preview card, most relevant first
 let preferred = "safe";   // what to pre-select when routes arrive; the AI can ask for "fastest" or "bus"
 
 let nav = null;           // { line, cum, total, steps, avgLight, spoken } while navigating
@@ -56,7 +59,8 @@ const LAZY_DATA = { lights: "/data/gt_lights.geojson", buses: "/bus/routes" };  
 const loaded = new Set();
 
 // the route groups drawn for each preview option
-const OPTION_LAYERS = { safe: ["safe-casing", "safe"], shortest: ["shortest"], bus: ["bus-walk", "bus-ride-casing", "bus-ride"] };
+const OPTION_LAYERS = { access: ["access-casing", "access"], safe: ["safe-casing", "safe"], shortest: ["shortest"],
+    bus: ["bus-walk", "bus-ride-casing", "bus-ride"] };
 const BUS_REFRESH_MS = 30000;   // live buses: every 30 s is plenty for the demo
 const busMarkers = new Map();
 
@@ -103,6 +107,7 @@ mapReady.then(() => {
 
     map.addSource("shortest", { type: "geojson", data: EMPTY });
     map.addSource("safe", { type: "geojson", data: EMPTY });
+    map.addSource("access", { type: "geojson", data: EMPTY });
     map.addSource("bus-walk", { type: "geojson", data: EMPTY });
     map.addSource("bus-ride", { type: "geojson", data: EMPTY });
     map.addSource("walked", { type: "geojson", data: EMPTY });
@@ -167,6 +172,15 @@ mapReady.then(() => {
             "line-width": 7,
             "line-color": LIGHT_COLOR,
         },
+    }, firstLabel);
+    // the step-free route (accessible mode): like the safest, with an accessibility-blue edge
+    map.addLayer({
+        id: "access-casing", type: "line", source: "access", layout: line,
+        paint: { "line-color": "#1a73e8", "line-width": 11 },
+    }, firstLabel);
+    map.addLayer({
+        id: "access", type: "line", source: "access", layout: line,
+        paint: { "line-width": 7, "line-color": LIGHT_COLOR },
     }, firstLabel);
 
     // Bus option: dotted walking legs (coloured by light) and the ride in the route's colour
@@ -300,7 +314,7 @@ function setAccessible(on) {
     mapReady.then(() => map.setLayoutProperty("sidewalk-issues", "visibility", on ? "visible" : "none"));
 
     // re-plan the route on screen for the new mode
-    if (mode === "preview") getRoute(tripStart(), lngLatToPoint(dest.getLngLat()));
+    if (mode === "preview") getRoute(tripStart(), target);
 }
 
 // ---- Live location ----
@@ -365,9 +379,10 @@ map.on("click", (e) => {
 
     if (mode !== "idle" || routing) return;
 
-    // tapping an ADA entrance routes to that exact door
+    // tapping an ADA entrance routes to that exact door; a tap inside a building goes to its best door
     const entrance = tapped(["ada"]);
     const lngLat = entrance ? entrance.geometry.coordinates : [e.lngLat.lng, e.lngLat.lat];
+    const at = { lat: lngLat[1], lng: lngLat[0] };
 
     if (!gpsUsable() && !start) {
         start = new maplibregl.Marker({ color: "#5f6368" }).setLngLat(lngLat).addTo(map);
@@ -375,16 +390,25 @@ map.on("click", (e) => {
         return;
     }
 
-    setDestination(lngLat, entrance ? entranceName(entrance.properties) : null);
+    setDestination(entrance ? { ...at, exact: true } : at, entrance ? entranceName(entrance.properties) : null);
 });
 
-// lngLat: [lng, lat]; name: the building, when there is one
-function setDestination(lngLat, name) {
+// to: { building } or { lat, lng } (exact: that very spot, not the building around it); name: what to call it
+function setDestination(to, name) {
     closeSearch();
+    target = to;
     destName = name;
-    dest = new maplibregl.Marker({ color: "#d93025" }).setLngLat(lngLat).addTo(map);
     statusEl.textContent = destName ? `Finding a route to ${destName}…` : "Finding the safest route…";
-    getRoute(tripStart(), { lat: lngLat[1], lng: lngLat[0] });
+    getRoute(tripStart(), to);
+}
+
+// Pin the spot the route ends at: the door the server picked (the best step-free one in accessible mode)
+function showDoor(data) {
+    const at = toLngLat(data.door);
+    if (dest) dest.setLngLat(at);
+    else dest = new maplibregl.Marker({ color: "#d93025" }).setLngLat(at).addTo(map);
+    destName = data.building ?? destName;
+    doorKind = data.door.kind;
 }
 
 function showCallbox(feature) {
@@ -417,37 +441,23 @@ function buildingName(p) {
 }
 
 // ---- Building search ----
-// Every building with an accessible entrance in GT's data; picking one routes to its entrance nearest the start
-const buildings = new Map();   // name → [[lng, lat], ...]
-const isEntrance = (p) => `${p.Name ?? ""} ${p.Description ?? ""}`.toLowerCase().includes("entrance");   // as the map's ADA layer
+// Every building on GT's campus maps, with the other names it goes by; the server picks which door to route to
+const buildings = new Map();   // name → other names ("Klaus Building" → ["Klaus Advanced Computing", ...])
 const searchInput = $("search-input");
 const suggestionsEl = $("suggestions");
 
-fetch("/data/gt_ada_entrances.geojson")
+fetch("/buildings")
     .then((res) => res.json())
-    .then((data) => {
-        for (const f of data.features) {
-            const name = isEntrance(f.properties) && buildingName(f.properties);
-            if (name) buildings.set(name, [...(buildings.get(name) ?? []), f.geometry.coordinates]);
-        }
-        // "Klaus Advanced Computing Building" is the same place as "Klaus Advanced Computing"
-        for (const [name, doors] of buildings) {
-            const short = name.replace(/ Building$/, "");
-            if (short !== name && buildings.has(short)) {
-                buildings.get(short).push(...doors);
-                buildings.delete(name);
-            }
-        }
-    });
+    .then((list) => list.forEach(([name, aka]) => buildings.set(name, aka)));
 
-// Every word typed must appear in the name; names that start with the first word come first
+// Every word typed must appear in the name (or another name for it); names that start with the first word come first
 function searchBuildings(text) {
     const words = text.toLowerCase().split(/\s+/).filter(Boolean);
     if (!words.length) return [];
     const matches = [];
-    for (const name of buildings.keys()) {
-        const lower = name.toLowerCase();
-        if (!words.every((w) => lower.includes(w))) continue;
+    for (const [name, aka] of buildings) {
+        const lower = [name, ...aka].map((n) => n.toLowerCase()).find((n) => words.every((w) => n.includes(w)));
+        if (!lower) continue;
         const at = lower.indexOf(words[0]);
         matches.push({ name, rank: at === 0 ? 0 : /\w/.test(lower[at - 1]) ? 2 : 1 });   // name start, word start, mid-word
     }
@@ -504,9 +514,7 @@ function goToBuilding(name, pick = "safe") {
         return;
     }
     preferred = pick;
-    const from = tripStart();
-    const away = ([lng, lat]) => distance(from, { lat, lng });
-    setDestination(buildings.get(name).reduce((a, b) => (away(a) <= away(b) ? a : b)), name);
+    setDestination({ building: name }, name);
 }
 
 function closeSearch() {
@@ -519,29 +527,32 @@ function closeSearch() {
 async function getRoute(from, to, { reroute = false } = {}) {
     routing = true;
     try {
-        const res = await api(`/route?from=${from.lat},${from.lng}&to=${to.lat},${to.lng}&accessible=${accessible ? 1 : 0}&avoid=${avoidParam()}`);
+        const where = to.building ? `building=${encodeURIComponent(to.building)}` : `to=${to.lat},${to.lng}${to.exact ? "&exact=1" : ""}`;
+        const res = await api(`/route?from=${from.lat},${from.lng}&${where}&accessible=${accessible ? 1 : 0}&avoid=${avoidParam()}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        if (!dest) return;   // user cancelled while we were waiting
+        if (!target) return;   // user cancelled while we were waiting
         await mapReady;
 
         routes = data;
+        const main = data.access ?? data.safe;   // the step-free route in accessible mode, otherwise the safest
         setSource("safe", data.safe.geojson);
+        setSource("access", data.access ? data.access.geojson : EMPTY);
         setSource("walked", EMPTY);
-        map.setFilter("callboxes-route", routeCallboxes(data.safe.callboxes));
+        map.setFilter("callboxes-route", routeCallboxes(main.callboxes));
 
         if (reroute) {
-            showOnly("safe");   // reroutes always follow the safest walk
-            startNav(data.safe);
+            showOnly(data.access ? "access" : "safe");   // reroutes follow the step-free or safest walk
+            startNav(main);
             speak("Rerouting");
             return;
         }
 
-        const same = data.safe.length_m === data.shortest.length_m;
-        setSource("shortest", same ? EMPTY : data.shortest.geojson);
+        showDoor(data);
+        setSource("shortest", data.shortest.geojson);
         setSource("bus-walk", data.bus ? data.bus.walk_geojson : EMPTY);
         setSource("bus-ride", data.bus ? data.bus.ride_geojson : EMPTY);
-        showPreview(data, same);
+        showPreview(data);
     } catch (err) {
         statusEl.textContent = `Couldn't get a route: ${err.message}`;
         if (!reroute) clearTrip({ keepStatus: true });
@@ -550,21 +561,23 @@ async function getRoute(from, to, { reroute = false } = {}) {
     }
 }
 
-function showPreview(data, same) {
+function showPreview(data) {
     setMode("preview");
-    map.setLayoutProperty("shortest", "visibility", "visible");
-    statusEl.textContent = destName ? `To ${destName}` : same ? "The shortest route is also the safest" : "Compare routes, then start";
+    const same = data.safe.length_m === data.shortest.length_m;
+    statusEl.textContent = destName ? `To ${destName}${doorNote()}` : same ? "The shortest route is also the safest" : "Compare routes, then start";
 
+    if (data.access) fillOption("access", data.access);
     fillOption("safe", data.safe);
     fillOption("short", data.shortest);
-    $("safe-tag").replaceChildren(...(accessible ? [icon("accessibility"), "Safest"] : ["Safest"]));
-    document.querySelector(".route-option.shortest").style.display = same ? "none" : "";
-
-    document.querySelector(".route-option.bus").style.display = data.bus ? "" : "none";
     if (data.bus) fillBusOption(data.bus);
-    const option = preferredOption(data, same);
-    selectOption(option);
-    if (preferred === "bus" && option !== "bus") statusEl.textContent = "No bus right now, so here's the safest walk";
+
+    // list the options most relevant first, and draw only those
+    shown = optionOrder(data, same);
+    const card = $("preview-card");
+    document.querySelectorAll(".route-option").forEach((row) => (row.style.display = shown.includes(row.dataset.option) ? "" : "none"));
+    shown.forEach((name) => card.insertBefore(card.querySelector(`.route-option.${name}`), card.querySelector(".actions")));
+    selectOption(shown[0]);
+    if (preferred === "bus" && !data.bus) statusEl.textContent = "No bus right now, so here's the safest walk";
     refreshBuses();
 
     // fit both routes into the space between the top chips and the bottom card
@@ -575,12 +588,29 @@ function showPreview(data, same) {
     if (top + bottom > room) [top, bottom] = [top * room / (top + bottom), bottom * room / (top + bottom)];
 
     const bounds = new maplibregl.LngLatBounds();
-    [...data.safe.line, ...data.shortest.line, ...(data.bus?.line ?? [])].forEach(([lat, lng]) => bounds.extend([lng, lat]));
+    [...(data.access?.line ?? []), ...data.safe.line, ...data.shortest.line, ...(data.bus?.line ?? [])].forEach(([lat, lng]) => bounds.extend([lng, lat]));
     const right = $("safety").offsetWidth + 24;   // keep the route clear of the safety buttons
     map.fitBounds(bounds, { padding: { top, bottom, left: 24, right }, pitch: 0, bearing: 0, duration: 800 });
 }
 
-// The option to pre-select: "fastest" is whichever of the shortest walk and the bus arrives first
+// What to call out about where the route ends
+function doorNote() {
+    if (doorKind === "wall") return " (no door on record, so this ends at the nearest wall)";
+    if (accessible && doorKind === "door") return " (no step-free entrance on record)";
+    return "";
+}
+
+// Most relevant first: the step-free route in accessible mode, then what was asked for (fastest or bus), then the
+// safest, shortest and bus. A walk the same length as one above it is the same walk, so it's left out.
+function optionOrder(data, same) {
+    const first = preferredOption(data, same);
+    const order = [first, ...["safe", "shortest", "bus"].filter((o) => o !== first)].filter((o) => o !== "bus" || data.bus);
+    if (data.access) order.unshift("access");
+    const lengths = new Set();
+    return order.filter((o) => o === "bus" || (!lengths.has(data[o].length_m) && lengths.add(data[o].length_m)));
+}
+
+// What was asked for: "fastest" is whichever of the shortest walk and the bus arrives first
 function preferredOption(data, same) {
     if (preferred === "bus" && data.bus) return "bus";
     if (preferred !== "fastest") return "safe";
@@ -618,7 +648,7 @@ function selectOption(name) {
     document.querySelectorAll(".route-option").forEach((row) => row.classList.toggle("selected", row.dataset.option === name));
     for (const [option, ids] of Object.entries(OPTION_LAYERS)) {
         ids.forEach((id) => {
-            map.setLayoutProperty(id, "visibility", "visible");
+            map.setLayoutProperty(id, "visibility", shown.includes(option) ? "visible" : "none");
             map.setPaintProperty(id, "line-opacity", option === name ? 1 : 0.35);
         });
     }
@@ -647,13 +677,13 @@ $("end").addEventListener("click", () => clearTrip());
 
 function clearTrip({ keepStatus = false } = {}) {
     [start, dest].forEach((m) => m && m.remove());
-    start = dest = destName = routes = nav = null;
+    start = dest = destName = target = doorKind = routes = nav = null;
     selected = preferred = "safe";
     offRouteCount = 0;
     alerted.clear();
     asked.clear();
     hideStillHere();
-    ["shortest", "safe", "bus-walk", "bus-ride", "walked"].forEach((id) => setSource(id, EMPTY));
+    ["shortest", "safe", "access", "bus-walk", "bus-ride", "walked"].forEach((id) => setSource(id, EMPTY));
     if (map.getLayer("callboxes-route")) map.setFilter("callboxes-route", routeCallboxes([]));
     window.speechSynthesis?.cancel();
 
@@ -758,7 +788,7 @@ function updateProgress() {
         $("turn-arrow").replaceChildren(icon("refresh-cw"));
         $("turn-distance").textContent = "Rerouting…";
         $("turn-text").textContent = "Finding a new safe route";
-        getRoute(here, lngLatToPoint(dest.getLngLat()), { reroute: true });
+        getRoute(here, { ...lngLatToPoint(dest.getLngLat()), exact: true }, { reroute: true });   // same door
         return;
     }
 
@@ -816,7 +846,8 @@ function arrive() {
     nav = null;
     $("turn-arrow").replaceChildren(icon("goal"));
     $("turn-distance").textContent = "You've arrived";
-    $("turn-text").textContent = destName ? `${destName} · accessible entrance` : "Stay safe!";
+    const door = { "step-free": "step-free entrance", door: "entrance" }[doorKind];
+    $("turn-text").textContent = destName ? [destName, door].filter(Boolean).join(" · ") : "Stay safe!";
     $("nav-time").textContent = "Arrived";
     $("nav-detail").textContent = "";
     $("end").textContent = "Done";

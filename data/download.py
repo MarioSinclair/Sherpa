@@ -59,21 +59,105 @@ def load_layers():
     return {name: gpd.read_file(path(name)) for name in LAYERS}
 
 
-def building_names(entrances):
-    """Names of the buildings in the ADA entrance layer, cleaned like buildingName() in script.js."""
+# ---- Buildings: every campus building with its doors, saved as data/gt_buildings.geojson ----
+BUILDINGS = "Campus_Building_Types/FeatureServer/0"   # GT's fullest building list, with readable names
+BUILDINGS_2026 = "GT_Campus2026/FeatureServer/1"      # adds the few buildings only the 2026 campus map has
+ADA_NEAR_M = 30        # an ADA entrance whose building number matches nothing joins the nearest footprint this close
+DOOR_ON_WALL_M = 5     # an OpenStreetMap door this close to a footprint belongs to it
+SAME_DOOR_M = 5        # an OpenStreetMap door this close to a GT ADA entrance is that entrance
+
+
+def text(x):
+    return x if isinstance(x, str) else ""
+
+
+def entrance_building(name, desc):
+    """"153 - ADA Building Entrance - Klaus Advanced Computing" → "Klaus Advanced Computing", like buildingName() in script.js."""
     import re
 
-    text = lambda x: x if isinstance(x, str) else ""
-    names = set()
-    for name, desc in zip(entrances["Name"], entrances["Description"]):
-        if "entrance" not in f"{text(name)} {text(desc)}".lower():      # the layer also holds stairs and notes
+    parts = re.split(r"\s+-\s*|\s*-\s+", (text(desc) or text(name)).replace("&amp;", "&"))
+    parts = [re.sub(r"\s+", " ", re.sub(r"\bADA\b|\b(Building\s+)?Entrance\b|\bElevator Access\b|=", "", p, flags=re.I)).strip()
+             for p in parts]
+    return " - ".join(p for p in parts if p and not re.fullmatch(r"\d+[A-Z]?", p, re.I))
+
+
+def download_buildings():
+    """Every building on GT's campus maps, with its doors: GT's ADA entrances (step-free) and OpenStreetMap entrances."""
+    import json, re, requests
+    import geopandas as gpd, osmnx as ox, pandas as pd
+
+    def layer(url, fields):
+        res = requests.get(f"{ARCGIS}/{url}/query", params={"where": "1=1", "outFields": fields, "outSR": 4326, "f": "geojson"},
+                           timeout=30).json()
+        if "features" not in res or res.get("properties", {}).get("exceededTransferLimit"):
+            raise RuntimeError(f"ArcGIS error for {url}: {res.get('error', 'more than one page')}")
+        return gpd.GeoDataFrame.from_features(res["features"], crs=4326)
+
+    number = lambda s: text(s).strip().upper().lstrip("0")
+    tidy = lambda s: re.sub(r"\s+", " ", text(s)).strip()
+
+    main = layer(BUILDINGS, "BLDG_NUM,BLDG_NAME")
+    main = gpd.GeoDataFrame({"num": main["BLDG_NUM"].map(number), "name": main["BLDG_NAME"].map(tidy)}, geometry=main.geometry)
+    new = layer(BUILDINGS_2026, "BUILDINGID,SHORTNAME,LONGNAME")
+    new = new[new["BUILDINGID"].map(number).ne("") & ~new["BUILDINGID"].map(number).isin(main["num"])]
+    new = gpd.GeoDataFrame({"num": new["BUILDINGID"].map(number),   # long names read "Smith, John M. Residence Hall"
+                            "name": [tidy(s if "," in text(l) else l or s) for l, s in zip(new["LONGNAME"], new["SHORTNAME"])]},
+                           geometry=new.geometry)
+    b = gpd.GeoDataFrame(pd.concat([main, new]), crs=4326)
+    b = b[b["name"] != ""].dissolve(by="name", aggfunc=lambda nums: sorted(set(nums) - {""})).reset_index()
+    utm = b.estimate_utm_crs()
+    walls = b.to_crs(utm)
+    places = {name: {"aka": set(), "doors": [], "nums": nums} for name, nums in zip(b["name"], b["num"])}
+
+    # GT's ADA entrances, matched by the building number they start with ("153 - ADA Building Entrance - Klaus")
+    ada = gpd.read_file(path("ada_entrances"))
+    ada = ada[["entrance" in f"{text(n)} {text(d)}".lower() for n, d in zip(ada["Name"], ada["Description"])]]   # not stairs or notes
+    by_num = {n: name for name, p in places.items() for n in p["nums"]}
+    near = gpd.sjoin_nearest(ada.to_crs(utm)[["geometry"]], walls[["name", "geometry"]], max_distance=ADA_NEAR_M, how="left")
+    near = near[~near.index.duplicated()]["name"]
+    for i, n, d, point in zip(ada.index, ada["Name"], ada["Description"], ada.geometry):
+        own = entrance_building(n, d)
+        num = re.match(r"\s*(\d+[A-Z]?)\b", text(d) or text(n))
+        name = by_num.get(num and number(num.group(1))) or (near[i] if isinstance(near[i], str) else None) or own
+        if not name:
             continue
-        parts = re.split(r"\s+-\s*|\s*-\s+", (text(desc) or text(name)).replace("&amp;", "&"))
-        parts = [re.sub(r"\s+", " ", re.sub(r"\bADA\b|\b(Building\s+)?Entrance\b|\bElevator Access\b|=", "", p, flags=re.I)).strip()
-                 for p in parts]
-        names.add(" - ".join(p for p in parts if p and not re.fullmatch(r"\d+[A-Z]?", p, re.I)))
-    # "Klaus Advanced Computing Building" is the same place as "Klaus Advanced Computing"
-    return sorted(n for n in names if n and not (n.endswith(" Building") and n[:-len(" Building")] in names))
+        place = places.setdefault(name, {"aka": set(), "doors": [], "nums": []})   # no footprint: just its doors
+        place["doors"].append([round(point.x, 6), round(point.y, 6), True])
+        if own and own != name:
+            place["aka"].add(own)   # keeps "Klaus Advanced Computing" findable as well as "Klaus Building"
+
+    # OpenStreetMap entrances on a footprint's wall (not exit-only doors); wheelchair=yes counts as step-free
+    w, s, e, n = b.total_bounds
+    osm = ox.features_from_bbox((w, s, e, n), {"entrance": True})
+    osm = osm[(osm.geom_type == "Point") & ~osm["entrance"].isin(["exit", "emergency", "no"])]
+    osm = gpd.sjoin_nearest(osm.to_crs(utm)[["geometry"]].assign(ada=osm.get("wheelchair", pd.Series(index=osm.index)).eq("yes")),
+                            walls[["name", "geometry"]], max_distance=DOOR_ON_WALL_M)
+    osm = osm[~osm.index.duplicated()]
+    to_wgs84 = osm.to_crs(4326).geometry
+    for (name, ada_door, point), ll in zip(zip(osm["name"], osm["ada"], osm.geometry), to_wgs84):
+        known = gpd.GeoSeries.from_xy([d[0] for d in places[name]["doors"]], [d[1] for d in places[name]["doors"]], crs=4326).to_crs(utm)
+        if not len(known) or known.distance(point).min() > SAME_DOOR_M:
+            places[name]["doors"].append([round(ll.x, 6), round(ll.y, 6), bool(ada_door)])
+
+    shapes = dict(zip(b["name"], b.geometry))
+    features = [{"type": "Feature",
+                 "properties": {"name": name, "aka": sorted(p["aka"]), "doors": p["doors"]},
+                 "geometry": shapes[name].__geo_interface__ if name in shapes else None}
+                for name, p in sorted(places.items())]
+    with open(path("buildings"), "w") as f:
+        json.dump({"type": "FeatureCollection", "features": features}, f)
+    with_doors = sum(1 for f in features if f["properties"]["doors"])
+    print(len(features), "buildings,", with_doors, "with doors,", sum(len(f["properties"]["doors"]) for f in features), "doors")
+
+
+def load_buildings():
+    """name → {"aka": [...], "doors": [[lng, lat, step_free], ...], "outline": shapely footprint or None}."""
+    import json
+    from shapely.geometry import shape
+
+    with open(path("buildings")) as f:
+        features = json.load(f)["features"]
+    return {f["properties"]["name"]: {**f["properties"], "outline": f["geometry"] and shape(f["geometry"])} for f in features}
 
 
 def check():
@@ -191,6 +275,7 @@ def sidewalk_access(edges, sidewalks, spacing=5, max_dist=10, max_angle=30):
 
 def main():
     #download()
+    #download_buildings()
     G = check()
     print(G.number_of_edges(), "edges scored")
 
