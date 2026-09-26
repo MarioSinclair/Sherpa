@@ -79,9 +79,10 @@ const gpsUsable = () =>
 
 const tripStart = () => (gpsUsable() ? here : lngLatToPoint(start.getLngLat()));
 
+// The status line under the search box; empty (hidden) when the search box says it all
 function idleHint() {
     if (!gpsUsable()) return "Tap the map to set a start point";
-    return layerOn.ada ? "Search, or tap the map or a blue-ringed entrance" : "Search for a building or tap the map";
+    return layerOn.ada ? "Or tap a blue-ringed entrance" : "";
 }
 
 // ---- Map layers ----
@@ -565,7 +566,13 @@ async function getRoute(from, to, { reroute = false } = {}) {
 function showPreview(data) {
     setMode("preview");
     const same = data.safe.length_m === data.shortest.length_m;
-    statusEl.textContent = destName ? `To ${destName}${doorNote()}` : same ? "The shortest route is also the safest" : "Compare routes, then start";
+    if (destName) {
+        const note = document.createElement("small");   // a quieter second line about where the route ends
+        note.textContent = doorNote();
+        statusEl.replaceChildren(`To ${destName}`, note);
+    } else {
+        statusEl.textContent = same ? "The shortest route is also the safest" : "Compare routes, then start";
+    }
 
     if (data.access) fillOption("access", data.access);
     fillOption("safe", data.safe);
@@ -596,8 +603,8 @@ function showPreview(data) {
 
 // What to call out about where the route ends
 function doorNote() {
-    if (doorKind === "wall") return " (no door on record, so this ends at the nearest wall)";
-    if (accessible && doorKind === "door") return " (no step-free entrance on record)";
+    if (doorKind === "wall") return "No door on record, so this ends at the nearest wall";
+    if (accessible && doorKind === "door") return "No step-free entrance on record";
     return "";
 }
 

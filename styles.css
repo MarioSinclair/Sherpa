@@ -72,67 +72,87 @@ body[data-mode="arrived"] #nav-bar {
 }
 
 #top-bar {
+    position: relative;   /* search suggestions hang below the whole bar */
     display: flex;
+    flex-wrap: wrap;
     align-self: stretch;
     align-items: center;
-    gap: 12px;
-    padding: 10px 16px;
-    border-radius: 12px;
-    background: var(--paper);
+    gap: 0 8px;
+    padding: 6px 2px 6px 6px;
+    border-radius: 16px;
+    background: white;
     color: var(--ink);
     box-shadow: var(--shadow);
 }
 
+#top-bar:focus-within {
+    box-shadow: 0 0 0 2px var(--blaze), var(--shadow);
+}
+
 #top-bar h1 {
     display: flex;
-    align-items: center;
-    gap: 8px;
     margin: 0;
-    font-family: var(--serif);
-    font-size: 1.25rem;
-    color: var(--pine);
 }
 
 .bar-logo {
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
 }
 
-#top-bar p {
+/* status: a quiet line under the search box, only when there's something to say */
+#status {
+    order: 1;   /* after the menu button, so it wraps onto its own line */
+    flex-basis: 100%;
+    margin: 0 0 4px 42px;   /* lined up with the search text */
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+#status:empty {
+    display: none;
+}
+
+/* previewing a route: no search box, so where you're going takes its place */
+body[data-mode="preview"] #search {
+    display: none;
+}
+
+body[data-mode="preview"] #status {
+    order: 0;
+    flex: 1;
     margin: 0;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+#status small {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: normal;
+    color: var(--muted);
+}
+
+#status small:empty {
+    display: none;
 }
 
 /* ---- Building search (idle) ---- */
 #search {
-    position: relative;
-    align-self: stretch;
-}
-
-#search .search-icon {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--muted);
-    pointer-events: none;
-}
-
-body[data-mode="preview"] #search {
-    display: none;
+    flex: 1;
+    min-width: 0;
 }
 
 #search-input {
     box-sizing: border-box;
     width: 100%;
-    padding: 10px 16px 10px 46px;   /* room for the search icon */
+    padding: 8px 2px;
     font: inherit;
     font-size: 16px;   /* 16px or more stops iOS zooming in on focus */
     border: none;
-    border-radius: 999px;
-    background: white;
-    box-shadow: var(--shadow);
+    outline: none;   /* the whole bar shows focus instead */
+    background: none;
     appearance: none;
 }
 
