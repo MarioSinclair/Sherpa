@@ -8,11 +8,11 @@ import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from pyproj import Transformer
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 
 import buses
 import assistant
-from data.download import building_names, load_layers, mapping
+from data.download import BLOCKED, building_names, load_layers, mapping
 
 load_dotenv()   # API keys from .env when running locally
 if not os.environ.get(assistant.key_name()):
@@ -29,6 +29,8 @@ to_graph = Transformer.from_crs("EPSG:4326", G.graph["crs"], always_xy=True)
 to_wgs84 = Transformer.from_crs(G.graph["crs"], "EPSG:4326", always_xy=True)
 print(G.number_of_edges(), "edges ready")
 buildings = building_names(layers["ada_entrances"])   # for the AI; the browser builds the same list for search
+edge_lines = ox.graph_to_gdfs(G, nodes=False)[["geometry"]]   # for finding the paths near reported spots
+edge_lines.sindex   # build the spatial index now, not on the first request
 
 
 bus_routes = buses.Routes(to_graph, to_wgs84)
@@ -47,6 +49,32 @@ STOP_SNAP_M = 50        # stops farther than this from any path (e.g. off campus
 CATCH_BUFFER_S = 60     # reach the stop at least a minute before the bus
 MAX_RIDE_S = 30 * 60
 BUS_WALK_SHARE = 0.6    # only offer the bus if it cuts walking to 60% or less
+
+
+# ---- Crowd reports: confirmed blocked paths and safety concerns are routed around ----
+AVOID_MAX = 20          # at most this many reported spots per request
+AVOID_RADIUS_MAX_M = 100
+
+
+def parse_avoid(text):
+    """Edges near the reported spots in "lat,lng,radius_m;..." (the browser decides which reports count)."""
+    avoid = set()
+    for part in (text or "").split(";")[:AVOID_MAX]:
+        try:
+            lat, lng, radius = map(float, part.split(","))
+        except ValueError:
+            continue
+        x, y = to_graph.transform(lng, lat)
+        near = edge_lines.sindex.query(Point(x, y).buffer(min(radius, AVOID_RADIUS_MAX_M)), predicate="intersects")
+        avoid.update(edge_lines.index[near])
+    return frozenset(avoid)
+
+
+def cost(weight, avoid):
+    """Routing cost: the usual edge weight, made BLOCKED times higher near reported spots."""
+    if not avoid:
+        return weight
+    return lambda u, v, edges: min(d[weight] * (BLOCKED if (u, v, k) in avoid else 1) for k, d in edges.items())
 
 
 def parse_point(text):
@@ -163,7 +191,7 @@ def route_steps(edges, coords):
     return steps
 
 
-def route_summary(nodes, weight):
+def route_summary(nodes, weight, avoid=frozenset()):
     edges = ox.routing.route_to_gdf(G, nodes, weight=weight)
     coords = oriented_coords(edges)
     length = edges["length"].sum()
@@ -177,18 +205,19 @@ def route_summary(nodes, weight):
         "callboxes": near["objectid"].tolist(),
         "access_m": {k: int(round(by_access.get(k, 0))) for k in ("no", "steps", "unknown")},
         "closed_m": int(round(edges.loc[edges["closed"].astype(bool), "length"].sum())),
+        "reported_m": int(round(edges.loc[[i in avoid for i in edges.index], "length"].sum())),   # no way around
         "geojson": edges[["light", "length", "geometry"]].to_crs(4326).__geo_interface__,
         "line": route_line(coords),
         "steps": route_steps(edges, coords),
     }
 
 
-def walk_leg(a, b, weight):
+def walk_leg(a, b, weight, avoid):
     """Walking summary between two graph nodes, or None if they're the same node."""
     if a == b:
         return None
-    nodes = ox.shortest_path(G, a, b, weight=weight)
-    return route_summary(nodes, weight) if nodes else None
+    nodes = ox.shortest_path(G, a, b, weight=cost(weight, avoid))
+    return route_summary(nodes, weight, avoid) if nodes else None
 
 
 def nodes_for_stops(route):
@@ -200,7 +229,7 @@ def nodes_for_stops(route):
     return stop_nodes[route["id"]]
 
 
-def plan_bus(orig, dest, weight, walk_m, speed):
+def plan_bus(orig, dest, weight, walk_m, speed, avoid):
     """Fastest single-bus trip (walk → ride → walk) using live arrival predictions, or None."""
     if walk_m < MIN_TRIP_M:
         return None
@@ -236,14 +265,14 @@ def plan_bus(orig, dest, weight, walk_m, speed):
     _, r, i, j, walk1, walk2, bus_in, ride_s = best
     if walk1 + walk2 > BUS_WALK_SHARE * walk_m:
         return None
-    return bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s, speed)
+    return bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s, speed, avoid)
 
 
-def bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s, speed):
+def bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s, speed, avoid):
     """Walk + ride + walk as one line with turn-by-turn steps, in the same shape as a walking route."""
     board, alight = r["stops"][i], r["stops"][j]
     nodes = nodes_for_stops(r)
-    leg1, leg2 = walk_leg(orig, nodes[i], weight), walk_leg(nodes[j], dest, weight)
+    leg1, leg2 = walk_leg(orig, nodes[i], weight, avoid), walk_leg(nodes[j], dest, weight, avoid)
     ride_geom = buses.ride_line(r, i, j)
     ride = [to_latlng(p) for p in ride_geom.coords]
 
@@ -281,6 +310,7 @@ def bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s, speed):
         "callboxes": sorted({c for leg in legs for c in leg["callboxes"]}),
         "access_m": {k: sum(leg["access_m"][k] for leg in legs) for k in ("no", "steps", "unknown")},
         "closed_m": sum(leg["closed_m"] for leg in legs),
+        "reported_m": sum(leg["reported_m"] for leg in legs),
         "walk_geojson": {"type": "FeatureCollection", "features": [f for leg in legs for f in leg["geojson"]["features"]]},
         "ride_geojson": {"type": "Feature", "properties": {"color": r["color"]},
                          "geometry": {"type": "LineString", "coordinates": [[lng, lat] for lat, lng in ride]}},
@@ -387,19 +417,20 @@ def route():
     weight = "cost_access" if accessible else "cost"
     speed = ACCESSIBLE_SPEED if accessible else WALK_SPEED
 
-    safe = ox.shortest_path(G, orig, dest, weight=weight)
-    short = ox.shortest_path(G, orig, dest, weight="length")
+    avoid = parse_avoid(request.args.get("avoid"))
+    safe = ox.shortest_path(G, orig, dest, weight=cost(weight, avoid))
+    short = ox.shortest_path(G, orig, dest, weight=cost("length", avoid))
     if safe is None:
         return jsonify(error="No walking route between those points"), 404
 
-    safe_route = route_summary(safe, weight)
+    safe_route = route_summary(safe, weight, avoid)
     try:
-        bus = plan_bus(orig, dest, weight, safe_route["length_m"], speed)
+        bus = plan_bus(orig, dest, weight, safe_route["length_m"], speed, avoid)
     except Exception as err:   # the bus feed is a bonus: never let it break walking directions
         print("bus planning skipped:", repr(err))
         bus = None
 
-    return jsonify(safe=safe_route, shortest=route_summary(short, "length"), bus=bus, accessible=accessible)
+    return jsonify(safe=safe_route, shortest=route_summary(short, "length", avoid), bus=bus, accessible=accessible)
 
 
 if __name__ == "__main__":
