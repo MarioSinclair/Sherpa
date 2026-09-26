@@ -716,6 +716,7 @@ function updateProgress() {
     }
     const snap = snapToLine(here, nav.line, nav.cum);
     const remaining = nav.total - snap.along;
+    nav.along = snap.along;   // for the "I feel unsafe" message
 
     setSource("walked", lineFeature([...nav.line.slice(0, snap.index + 1), snap.point]));
 
@@ -841,6 +842,86 @@ function speak(text) {
     speechSynthesis.cancel();
     speechSynthesis.speak(new SpeechSynthesisUtterance(text));
 }
+
+// ---- Safety: "I feel unsafe" and GTPD ----
+// We don't send anything ourselves: the phone's own texting app and dialer do, so the contact sees your number
+let contact = loadContact();   // your emergency contact, kept on this device
+let textAfterSave = false;     // the contact form was opened by "I feel unsafe", so text once it's saved
+
+function loadContact() {
+    try {
+        return JSON.parse(localStorage.getItem("waypoint-contact"));
+    } catch {
+        return null;
+    }
+}
+
+function saveContact(next) {
+    contact = next;
+    try {
+        localStorage.setItem("waypoint-contact", JSON.stringify(next));
+    } catch {}   // private browsing: remembered until the page reloads
+}
+
+$("unsafe").addEventListener("click", () => (contact ? textContact(contact) : editContact({ thenText: true })));
+
+function editContact({ thenText = false } = {}) {
+    $("contact-name").value = contact?.name ?? "";
+    $("contact-phone").value = contact?.phone ?? "";
+    textAfterSave = thenText;
+    $("contact-dialog").showModal();
+}
+
+$("contact-cancel").addEventListener("click", () => $("contact-dialog").close());
+$("contact-form").addEventListener("submit", () => {   // method="dialog": the form closes itself
+    saveContact({ name: $("contact-name").value.trim(), phone: $("contact-phone").value.trim() });
+    if (textAfterSave) textContact(contact);
+});
+
+function textContact(to) {
+    const phone = to.phone.replace(/[^\d+]/g, "");
+    openLink(`sms:${phone}?&body=${encodeURIComponent(alertMessage())}`);   // "?&body=" works on iPhone and Android
+    $("unsafe-title").textContent = `Texting ${to.name}`;
+    if (!$("unsafe-dialog").open) $("unsafe-dialog").showModal();
+}
+
+// Where you are, your trip and how far along it, and the time
+function alertMessage() {
+    const time = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const lines = [`I feel unsafe and want you to know where I am (${time}, sent from Waypoint).`];
+    lines.push(here ? `I'm here: ${mapLink(here)}` : "My phone couldn't get my location.");
+    if (dest && (mode === "nav" || mode === "preview")) {
+        const to = `${destName ?? "a spot on the map"} ${mapLink(lngLatToPoint(dest.getLngLat()))}`;
+        const from = mapLink(mode === "nav" ? nav.line[0] : tripStart());
+        lines.push(mode === "nav" ? `I'm walking to ${to}` : `I'm about to walk to ${to}`, `I started at ${from}`);
+        if (mode === "nav" && nav.along != null) {
+            lines.push(`I'm ${Math.round((100 * nav.along) / nav.total)}% of the way there, ${formatDist(nav.total - nav.along)} to go.`);
+        }
+    }
+    return lines.join("\n");
+}
+
+const mapLink = (p) => `https://maps.google.com/?q=${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
+
+function openLink(url) {
+    window.location.href = url;
+}
+
+$("unsafe-again").addEventListener("click", () => textContact(contact));
+$("unsafe-done").addEventListener("click", () => $("unsafe-dialog").close());
+$("unsafe-edit").addEventListener("click", () => {
+    $("unsafe-dialog").close();
+    editContact();
+});
+$("unsafe-gtpd").addEventListener("click", () => {
+    $("unsafe-dialog").close();
+    $("gtpd-dialog").showModal();
+});
+
+// GTPD: one confirmation, then the "Call now" link opens the dialer
+$("gtpd").addEventListener("click", () => $("gtpd-dialog").showModal());
+$("gtpd-cancel").addEventListener("click", () => $("gtpd-dialog").close());
+$("gtpd-call").addEventListener("click", () => $("gtpd-dialog").close());
 
 // ---- Geometry helpers ----
 const ARROWS = {

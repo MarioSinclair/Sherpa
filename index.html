@@ -100,6 +100,49 @@
 
     <button id="recenter" class="floating" hidden>◎ Recenter</button>
 
+    <!-- Safety, on screen in every mode: text your emergency contact, or call campus police -->
+    <div id="safety">
+        <button id="unsafe" class="safety-btn unsafe">💬 I feel unsafe</button>
+        <button id="gtpd" class="safety-btn gtpd">📞 GTPD</button>
+    </div>
+
+    <!-- Set once; after that "I feel unsafe" texts this person straight away -->
+    <dialog id="contact-dialog">
+        <form id="contact-form" method="dialog">
+            <h2>Emergency contact</h2>
+            <p>“I feel unsafe” opens a text to this person with where you are, where you're walking and the time.</p>
+            <label>Name <input id="contact-name" required maxlength="60" autocomplete="name"></label>
+            <label>Mobile number <input id="contact-phone" type="tel" required autocomplete="tel" pattern="[+0-9 \(\)\.\-]{7,20}"></label>
+            <div class="actions">
+                <button id="contact-cancel" type="button" class="secondary">Cancel</button>
+                <button type="submit" class="primary">Save</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- After "I feel unsafe": the app can't see whether the text was actually sent -->
+    <dialog id="unsafe-dialog">
+        <h2 id="unsafe-title"></h2>
+        <p>Press send in your texting app. The message has your location, your trip and the time.</p>
+        <div class="stack">
+            <button id="unsafe-again" class="secondary">Send again</button>
+            <button id="unsafe-gtpd" class="danger">📞 Call GTPD</button>
+            <button id="unsafe-done" class="primary">Done</button>
+            <button id="unsafe-edit" class="link">Change contact</button>
+        </div>
+    </dialog>
+
+    <!-- One confirmation, then the phone's dialer -->
+    <dialog id="gtpd-dialog">
+        <h2>Call Georgia Tech Police?</h2>
+        <p>404-894-2500, answered 24/7. Calling 911 from a cell phone reaches Atlanta Police instead.</p>
+        <div class="actions">
+            <button id="gtpd-cancel" class="secondary">Cancel</button>
+            <a id="gtpd-call" class="button danger" href="tel:+14048942500">📞 Call now</a>
+        </div>
+    </dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
     <script src="script.js"></script>
 </body>

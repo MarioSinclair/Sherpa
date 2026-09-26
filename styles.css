@@ -44,6 +44,7 @@ body[data-mode="arrived"] #nav-bar {
 /* ---- Top bar, chips and legend (idle / preview) ---- */
 #top-stack {
     top: 12px;
+    z-index: 3;   /* search suggestions drop over the safety buttons */
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
@@ -369,6 +370,97 @@ button.floating {
 
 button[hidden] {
     display: none;
+}
+
+/* ---- Safety buttons: on screen in every mode, between the top bar and the bottom sheets ---- */
+#safety {
+    position: absolute;
+    right: 12px;
+    top: 45%;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    transform: translateY(-50%);
+}
+
+button.safety-btn {
+    color: white;
+    font-weight: 700;
+    box-shadow: var(--shadow);
+}
+
+button.safety-btn.unsafe { background: #b06000; }
+button.safety-btn.gtpd   { background: #d93025; }
+
+/* ---- Pop-ups (emergency contact, after "I feel unsafe", call GTPD) ---- */
+dialog {
+    box-sizing: border-box;
+    width: min(360px, calc(100vw - 32px));
+    padding: 20px;
+    border: none;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+}
+
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+dialog h2 {
+    margin: 0 0 8px;
+    font-size: 1.2rem;
+}
+
+dialog p {
+    margin: 0 0 16px;
+    color: var(--muted);
+}
+
+dialog label {
+    display: block;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+dialog input {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 16px;   /* no iOS zoom on focus */
+    border: 1px solid #dadce0;
+    border-radius: 10px;
+}
+
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+button.link {
+    background: none;
+    color: #1a73e8;
+}
+
+a.button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 18px;
+    border-radius: 999px;
+    text-decoration: none;
+}
+
+a.button.danger {
+    flex: 2;
+    background: #d93025;
+    color: white;
+    font-weight: 600;
 }
 
 /* ---- You-are-here marker ---- */
