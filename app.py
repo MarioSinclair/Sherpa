@@ -29,8 +29,9 @@ MAX_SNAP_M = 300        # refuse start/end points farther than this from any wal
 CALLBOX_ALONG_M = 40    # call boxes this close to the route count as "along" it
 
 # ---- Bus alternative ----
-WALK_SPEED = 1.4        # m/s
-MIN_TRIP_M = 500        # don't suggest a bus for walks shorter than this
+WALK_SPEED = 1.34       # m/s (3 mph)
+ACCESSIBLE_SPEED = 1.12 # m/s (2.5 mph), in accessible mode
+MIN_TRIP_M = 500       # don't suggest a bus for walks shorter than this
 MAX_STOP_WALK_M = 600   # walk at most this far to or from a stop
 STOP_SNAP_M = 50        # stops farther than this from any path (e.g. off campus) can't be walked to
 CATCH_BUFFER_S = 60     # reach the stop at least a minute before the bus
@@ -189,7 +190,7 @@ def nodes_for_stops(route):
     return stop_nodes[route["id"]]
 
 
-def plan_bus(orig, dest, weight, walk_m):
+def plan_bus(orig, dest, weight, walk_m, speed):
     """Fastest single-bus trip (walk → ride → walk) using live arrival predictions, or None."""
     if walk_m < MIN_TRIP_M:
         return None
@@ -208,7 +209,7 @@ def plan_bus(orig, dest, weight, walk_m):
         alights = [(j, near_end[n]) for j, n in enumerate(nodes) if n in near_end]
         for i, walk1 in boards:
             # the first bus we can walk to in time
-            reach_s = walk1 / WALK_SPEED + CATCH_BUFFER_S
+            reach_s = walk1 / speed + CATCH_BUFFER_S
             bus_in = next((s for s in live.get(r["stops"][i]["route_stop_id"], []) if s >= reach_s), None)
             if bus_in is None:
                 continue
@@ -216,7 +217,7 @@ def plan_bus(orig, dest, weight, walk_m):
                 if j == i:
                     continue
                 ride_s = buses.ride_seconds(r, i, j)
-                total = bus_in + ride_s + walk2 / WALK_SPEED
+                total = bus_in + ride_s + walk2 / speed
                 if ride_s <= MAX_RIDE_S and (best is None or total < best[0]):
                     best = (total, r, i, j, walk1, walk2, bus_in, ride_s)
 
@@ -225,10 +226,10 @@ def plan_bus(orig, dest, weight, walk_m):
     _, r, i, j, walk1, walk2, bus_in, ride_s = best
     if walk1 + walk2 > BUS_WALK_SHARE * walk_m:
         return None
-    return bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s)
+    return bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s, speed)
 
 
-def bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s):
+def bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s, speed):
     """Walk + ride + walk as one line with turn-by-turn steps, in the same shape as a walking route."""
     board, alight = r["stops"][i], r["stops"][j]
     nodes = nodes_for_stops(r)
@@ -263,7 +264,7 @@ def bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s):
         "bus_in_s": int(bus_in),
         "ride_s": int(ride_s),
         "stops": (j - i) % len(r["stops"]),
-        "total_s": int(bus_in + ride_s + (leg2["length_m"] if leg2 else 0) / WALK_SPEED),
+        "total_s": int(bus_in + ride_s + (leg2["length_m"] if leg2 else 0) / speed),
         "planned_at": time.time(),
         "walk_m": walk_m,
         "avg_light": round(sum(leg["avg_light"] * leg["length_m"] for leg in legs) / walk_m, 2) if walk_m else 1.0,
@@ -325,6 +326,7 @@ def route():
 
     accessible = request.args.get("accessible") == "1"
     weight = "cost_access" if accessible else "cost"
+    speed = ACCESSIBLE_SPEED if accessible else WALK_SPEED
 
     safe = ox.shortest_path(G, orig, dest, weight=weight)
     short = ox.shortest_path(G, orig, dest, weight="length")
@@ -333,7 +335,7 @@ def route():
 
     safe_route = route_summary(safe, weight)
     try:
-        bus = plan_bus(orig, dest, weight, safe_route["length_m"])
+        bus = plan_bus(orig, dest, weight, safe_route["length_m"], speed)
     except Exception as err:   # the bus feed is a bonus: never let it break walking directions
         print("bus planning skipped:", repr(err))
         bus = None

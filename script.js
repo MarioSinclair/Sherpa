@@ -19,7 +19,8 @@ const REROUTE_GAP_MS = 10000;  // wait at least this long between reroutes
 const ARRIVED_M = 15;          // this close to the end counts as arrived
 const MAX_ACCURACY_M = 50;     // ignore fuzzier GPS fixes for off-route checks
 const ANNOUNCE_M = 40;         // speak the next turn this far ahead
-const WALK_SPEED = 1.4;        // m/s, for time estimates
+const WALK_SPEED = 1.34;       // m/s (3 mph), for time estimates
+const ACCESSIBLE_SPEED = 1.12; // m/s (2.5 mph) in accessible mode
 const NAV_ZOOM = 18;
 const NAV_PITCH = 60;
 
@@ -47,6 +48,7 @@ let routing = false;
 let voiceOn = true;
 
 let accessible = false;                        // ♿ route around stairs and non-compliant sidewalks
+const walkSpeed = () => (accessible ? ACCESSIBLE_SPEED : WALK_SPEED);
 const layerOn = { lights: false, buses: false, callboxes: true, ada: false };
 const LAYER_IDS = { lights: ["lights-glow", "lights"], buses: ["bus-routes", "bus-stops"], callboxes: ["callboxes"], ada: ["ada"] };
 const LAZY_DATA = { lights: "/data/gt_lights.geojson", buses: "/bus/routes" };   // fetched the first time the chip is turned on
@@ -656,12 +658,12 @@ function showStep(step, along, remaining) {
 // Time left: walking pace, plus on a bus trip the wait for the bus and the scheduled ride
 function secondsLeft(along, remaining) {
     const bus = nav.bus;
-    if (!bus || along >= bus.alightAt) return remaining / WALK_SPEED;
-    const walkAfter = (nav.total - bus.alightAt) / WALK_SPEED;
+    if (!bus || along >= bus.alightAt) return remaining / walkSpeed();
+    const walkAfter = (nav.total - bus.alightAt) / walkSpeed();
     if (along >= bus.boardAt) {
         return bus.rideS * (bus.alightAt - along) / (bus.alightAt - bus.boardAt) + walkAfter;
     }
-    const toBus = Math.max((bus.dueAt - Date.now()) / 1000, (bus.boardAt - along) / WALK_SPEED);
+    const toBus = Math.max((bus.dueAt - Date.now()) / 1000, (bus.boardAt - along) / walkSpeed());
     return toBus + bus.rideS + walkAfter;
 }
 
@@ -788,7 +790,7 @@ function formatDist(m) {
 }
 
 function formatMins(m) {
-    return formatSecs(m / WALK_SPEED);
+    return formatSecs(m / walkSpeed());
 }
 
 function formatSecs(s) {
