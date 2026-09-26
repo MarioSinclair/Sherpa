@@ -49,9 +49,12 @@ def route_settings(text, buildings):
     """
     ask = _muse if os.environ.get("AI_PROVIDER", "claude") == "muse" else _claude
     listing = "\n".join(f"{name} (also {', '.join(aka)})" if aka else name for name, aka in buildings.items())
-    out = ask(PROMPT + listing, text[:MAX_CHARS])
     exact = {n.lower(): name for name, aka in buildings.items() for n in (name, *aka)}
-    out["destination"] = exact.get((out["destination"] or "").strip().lower())   # only names we can route to
+    for _ in range(2):   # it now and then answers "no building" for a request it gets right the next time: ask once more
+        out = ask(PROMPT + listing, text[:MAX_CHARS])
+        out["destination"] = exact.get((out["destination"] or "").strip().lower())   # only names we can route to
+        if out["destination"]:
+            break
     return out
 
 
@@ -81,15 +84,21 @@ def _claude(system, text):
 
 # ---- Muse Spark (Meta Model API, OpenAI-style) ----
 MUSE_API = "https://api.meta.ai/v1/chat/completions"
-MUSE_MODEL = "muse-spark-1.3"
+# 1.3 sometimes answers "model not found" (1 in 4 requests on 2026-09-26) while 1.2 doesn't: try 1.3 twice, then 1.2
+MUSE_MODELS = ("muse-spark-1.3", "muse-spark-1.3", "muse-spark-1.2")
+RETRY_STATUS = {404, 429, 500, 502, 503, 504}   # these fail fast, so trying again costs well under a second
 
 
 def _muse(system, text):
-    res = requests.post(MUSE_API, timeout=TIMEOUT_S, headers={"Authorization": f"Bearer {os.environ['META_API_KEY']}"}, json={
-        "model": MUSE_MODEL,
-        "reasoning_effort": "low",   # same answers in tests, about twice as fast and half the tokens
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": text}],
-        "response_format": {"type": "json_schema", "json_schema": {"name": "route_settings", "strict": True, "schema": SCHEMA}},
-    })
+    for attempt, model in enumerate(MUSE_MODELS, 1):
+        res = requests.post(MUSE_API, timeout=TIMEOUT_S, headers={"Authorization": f"Bearer {os.environ['META_API_KEY']}"}, json={
+            "model": model,
+            "reasoning_effort": "low",   # same answers in tests, about twice as fast and half the tokens
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": text}],
+            "response_format": {"type": "json_schema", "json_schema": {"name": "route_settings", "strict": True, "schema": SCHEMA}},
+        })
+        if res.status_code not in RETRY_STATUS or attempt == len(MUSE_MODELS):
+            break
+        print(f"Muse {model} answered {res.status_code}, trying again", flush=True)
     res.raise_for_status()
     return json.loads(res.json()["choices"][0]["message"]["content"])

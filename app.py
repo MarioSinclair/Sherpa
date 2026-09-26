@@ -538,7 +538,7 @@ def ask():
         return jsonify(assistant.route_settings(text, {name: b["aka"] for name, b in buildings.items()}))
     except Exception as err:   # the AI is a bonus: building search works without it
         print("AI failed:", repr(err), flush=True)
-        return jsonify(error="Couldn't understand that. Try a building name"), 502
+        return jsonify(error="The assistant didn't answer. Try again, or type a building name"), 502
 
 
 @app.get("/route")
