@@ -1,0 +1,6 @@
+# secrets: API keys live here locally and in Render's environment settings
+.env
+
+venv/
+__pycache__/
+.DS_Store
