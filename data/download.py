@@ -20,7 +20,8 @@ CALLBOX_FULL_M = 75    # call box within this distance → full credit
 CALLBOX_NONE_M = 250   # farther than this → no credit
 BLOCKED = 1000         # cost multiplier for edges to avoid unless there's no other way
 CLOSED_RECENT_DAYS = 30   # GT "Close" statuses older than this are stale (today's are from Sept 2025)
-ACCESS_FACTOR = {"yes": 1, "unknown": 1.5, "no": 4, "steps": BLOCKED}   # accessible routing only
+# accessible routing only: GT's "not ADA compliant" is often stairs (62% has OSM stairs within 10 m), so it's avoided like stairs
+ACCESS_FACTOR = {"yes": 1, "unknown": 1.5, "no": BLOCKED, "steps": BLOCKED}
 
 
 def path(name):
