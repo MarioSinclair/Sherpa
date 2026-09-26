@@ -104,7 +104,7 @@ mapReady.then(() => {
     map.addSource("sidewalks", { type: "geojson", data: "/data/gt_sidewalks.geojson" });
     map.addSource("osm-stairs", { type: "geojson", data: "/stairs" });   // stairs GT's sidewalk data doesn't have
     map.addSource("callboxes", { type: "geojson", data: "/data/gt_callboxes.geojson" });
-    map.addSource("ada", { type: "geojson", data: "/data/gt_ada_entrances.geojson" });
+    map.addSource("ada", { type: "geojson", data: "/ada-entrances" });   // minus the ones only stairs lead to
 
     map.addSource("buses", { type: "geojson", data: EMPTY });    // filled when the Buses chip is first turned on
 
@@ -609,7 +609,7 @@ function showPreview(data) {
 // What to call out about where the route ends
 function doorNote() {
     if (doorKind === "wall") return "No door on record, so this ends at the nearest wall";
-    if (accessible && doorKind === "door") return "No step-free entrance on record";
+    if (accessible && doorKind === "door") return "No step-free entrance found";
     return "";
 }
 

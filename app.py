@@ -1,4 +1,5 @@
 import itertools
+import json
 import math
 import os
 import threading
@@ -17,7 +18,7 @@ from shapely.ops import substring
 
 import buses
 import assistant
-from data.download import ACCESS_FACTOR, BLOCKED, load_buildings, load_layers, mapping
+from data.download import ACCESS_FACTOR, BLOCKED, load_buildings, load_layers, mapping, path
 
 load_dotenv()   # API keys from .env when running locally
 if not os.environ.get(assistant.key_name()):
@@ -37,7 +38,7 @@ buildings = load_buildings()   # name → other names, doors and footprint: for 
 footprints = gpd.GeoSeries([b["outline"] for b in buildings.values()], index=list(buildings), crs=4326).dropna().to_crs(G.graph["crs"])
 all_edges = ox.graph_to_gdfs(G, nodes=False)
 edge_lines = all_edges[["geometry"]]   # for finding the paths near reported spots and doors
-level_lines = edge_lines[~all_edges["stairs"].astype(bool)]   # step-free doors join the nearest path that isn't stairs
+level_lines = edge_lines[all_edges["access"] != "steps"]   # step-free doors join the nearest path that isn't stairs
 stairs_geojson = all_edges.loc[all_edges["stairs"].astype(bool), ["geometry"]].to_crs(4326).__geo_interface__   # OSM stairs, for the map
 graph_nodes = ox.graph_to_gdfs(G, edges=False)[["geometry"]]  # the real nodes (routes add temporary ones for doors)
 footprints.sindex, edge_lines.sindex, level_lines.sindex, graph_nodes.sindex   # build the spatial indexes now, not on the first request
@@ -104,6 +105,34 @@ DOOR_SNAP_M = 60        # doors farther than this from any path can't be walked 
 WALL_EVERY_M = 8        # a building with no known door: try a spot on its wall every 8 m
 route_lock = threading.Lock()       # door routes add temporary nodes to the shared graph, one request at a time
 new_ids = itertools.count(-1, -1)   # temporary node ids (OSM's are positive)
+
+
+def demote_stair_doors():
+    """GT lists a few step-free doors that can only be reached by stairs (checked on the ground): the stairs win.
+
+    A door counts as step-free only if its nearest stair-free path joins the rest of campus without stairs.
+    Returns the demoted doors as (lng, lat).
+    """
+    level = G.edge_subgraph(level_lines.index)
+    main = max(nx.weakly_connected_components(level), key=len)
+    demoted = set()
+    for b in buildings.values():
+        for door in b["doors"]:
+            if not door[2]:
+                continue
+            hit = level_lines.sindex.nearest(Point(to_graph.transform(door[0], door[1])), max_distance=DOOR_SNAP_M, return_all=False)[1]
+            if not len(hit) or level_lines.index[hit[0]][0] not in main:
+                door[2] = False
+                demoted.add((door[0], door[1]))
+    return demoted
+
+
+stair_doors = demote_stair_doors()
+print(len(stair_doors), "GT step-free doors can only be reached by stairs, so they count as ordinary doors")
+with open(path("ada_entrances")) as f:   # the map's ADA entrances, without those
+    ada_geojson = json.load(f)
+ada_geojson["features"] = [f for f in ada_geojson["features"]
+                           if (round(f["geometry"]["coordinates"][0], 6), round(f["geometry"]["coordinates"][1], 6)) not in stair_doors]
 
 
 def building_at(x, y):
@@ -476,6 +505,12 @@ def bus_vehicles():
         "lng": v["Longitude"],
         "heading": v["Heading"],
     } for v in buses.vehicles()])
+
+
+@app.get("/ada-entrances")
+def ada_entrances():
+    """GT's ADA entrances for the map, minus the ones only stairs lead to."""
+    return jsonify(ada_geojson)
 
 
 @app.get("/stairs")
