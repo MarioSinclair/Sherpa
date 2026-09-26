@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sherpa, routes built around you</title>
+<meta name="description" content="Sherpa builds your campus route around what's actually going on, not just the shortest path. Built for Georgia Tech campus.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="bg-field" aria-hidden="true">
+  <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <pattern id="routeTile" width="280" height="280" patternUnits="userSpaceOnUse">
+        <path class="grid-path" d="M0 40 Q 60 10 100 50 T 200 30"/>
+        <path class="grid-path" d="M30 0 Q 10 60 50 100 T 30 200"/>
+        <circle class="grid-dot" cx="100" cy="50" r="2.5"/>
+        <circle class="grid-dot" cx="150" cy="100" r="2.5"/>
+      </pattern>
+    </defs>
+    <rect width="1000" height="1000" fill="url(#routeTile)"/>
+    <path class="live-route" d="M-50 300 C 200 150 400 450 600 300 S 900 150 1050 300"/>
+  </svg>
+</div>
+
+<div class="progress" id="progress"></div>
+
+<nav>
+  <div class="nav-pill">
+    <a href="#" class="logo">
+      <img src="sherpa-mark.png" alt="" width="26" height="28" aria-hidden="true">
+      Sherpa
+    </a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle menu"><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <a href="#features">Why it's better</a>
+      <a href="#how">How it works</a>
+      <button class="btn btn-primary btn-sm" data-open-login>Try Sherpa</button>
+    </div>
+  </div>
+</nav>
+
+<div class="route-scene">
+  <div class="route-layer" id="route-layer" aria-hidden="true">
+    <svg id="route-svg" preserveAspectRatio="none">
+      <path id="route-path" class="route-path"/>
+      <circle class="route-stop"/>
+      <circle class="route-stop"/>
+      <circle class="route-stop"/>
+      <circle class="route-stop"/>
+    </svg>
+    <div class="route-bus" id="route-bus">
+      <svg viewBox="0 0 64 32">
+        <!-- Georgia Tech Stinger shuttle livery: gold roof, white window band, navy body, gold pinstripe -->
+        <rect x="4" y="4" width="52" height="5" rx="2.5" fill="#B3A369"/>
+        <text x="12" y="7.8" font-family="Arial, sans-serif" font-weight="800" font-size="4.4" fill="#003057" text-anchor="middle">GT</text>
+        <rect x="2" y="8" width="56" height="10" rx="3" fill="#FDFBF6"/>
+        <rect x="6" y="10.5" width="44" height="5.5" rx="1.4" fill="#14181A"/>
+        <text x="28" y="15" font-family="Brush Script MT, Segoe Script, cursive" font-style="italic" font-weight="700" font-size="6.6" fill="#FDFBF6" text-anchor="middle">Stinger</text>
+        <rect x="2" y="18" width="56" height="3" fill="#B3A369"/>
+        <rect x="2" y="21" width="56" height="7" rx="2" fill="#003057"/>
+        <circle cx="57" cy="15" r="1.6" fill="#F4D35E"/>
+        <circle cx="14" cy="28" r="4.5" fill="#14181A"/>
+        <circle cx="14" cy="28" r="1.8" fill="#D9D9D9"/>
+        <circle cx="50" cy="28" r="4.5" fill="#14181A"/>
+        <circle cx="50" cy="28" r="1.8" fill="#D9D9D9"/>
+      </svg>
+    </div>
+  </div>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <h1>The fastest route isn't always the <em>right</em> route<span class="accent-dot">.</span></h1>
+      <p class="lead">Sherpa builds your route around what's actually going on, not just the shortest path. Built for Georgia Tech campus.</p>
+      <div class="hero-ctas">
+        <button class="btn btn-primary" data-open-login>Plan a route <span class="arrow">→</span></button>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+    </div>
+
+    <!-- Interactive demo — the page's one product visual -->
+    <div class="demo-col">
+      <div class="device-frame">
+        <div class="device-bar">
+          <div class="device-dots"><span></span><span></span><span></span></div>
+          <span class="device-url">sherpa.app/route · klaus → north ave dining</span>
+        </div>
+        <div class="demo">
+          <p class="demo-route">Klaus → North Ave Dining</p>
+          <p class="demo-ask">What matters for this trip?</p>
+          <div class="scenarios" role="group" aria-label="Pick a situation">
+            <button class="scenario" aria-pressed="true" data-s="night">Walking home late</button>
+            <button class="scenario" aria-pressed="false" data-s="injury">I'm injured</button>
+            <button class="scenario" aria-pressed="false" data-s="stairs">Avoid stairs</button>
+          </div>
+
+          <div class="map-frame" id="map-frame"></div>
+
+          <div class="compare" aria-live="polite">
+            <div class="compare-row fastest">
+              <span class="clabel">Fastest route</span>
+              <span class="track"><span class="fill" id="fastFill"></span></span>
+              <span class="ctime" id="fastTime">11 min</span>
+            </div>
+            <div class="compare-row yours">
+              <span class="clabel">Sherpa</span>
+              <span class="track"><span class="fill" id="yourFill"></span></span>
+              <span class="ctime" id="yourTime">12 min</span>
+            </div>
+          </div>
+          <p class="why" id="why">1 min longer · better lighting · passes 2 emergency call boxes</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="block" id="features">
+  <div class="wrap">
+    <span class="eyebrow">[ 01 ] Why it's better</span>
+    <h2 class="wipe">Built for real campus situations.</h2>
+    <div class="benefits">
+      <div class="benefit-card glass">
+        <span class="benefit-icon safety">●</span>
+        <h3>Safer at night</h3>
+        <p>Lit paths, call boxes nearby, and location sharing with one tap.</p>
+      </div>
+      <div class="benefit-card glass">
+        <span class="benefit-icon access">A</span>
+        <h3>Built for accessibility</h3>
+        <p>Skips stairs. Routes to entrances you can actually use.</p>
+      </div>
+      <div class="benefit-card glass">
+        <span class="benefit-icon reports">●</span>
+        <h3>Live student reports</h3>
+        <p>Avoids paths other students just flagged as blocked or broken.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="how" style="background:var(--panel)">
+  <div class="wrap">
+    <span class="eyebrow">[ 02 ] How it works</span>
+    <h2 class="wipe">Tell us what matters. We'll route around it.</h2>
+
+    <div class="steps-track" aria-hidden="true">
+      <svg viewBox="0 0 1000 34" preserveAspectRatio="none">
+        <path class="track-line" d="M20 17 H980"/>
+        <circle class="track-dot" cx="186" cy="17" r="5"/>
+        <circle class="track-dot" cx="500" cy="17" r="5"/>
+        <circle class="track-dot" cx="814" cy="17" r="5"/>
+      </svg>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-visual" aria-hidden="true">
+          <svg viewBox="0 0 56 56">
+            <path d="M8 44 Q 20 34 26 40 T 44 32" stroke="var(--line)" stroke-width="2" stroke-dasharray="3 5" fill="none"/>
+            <circle cx="8" cy="44" r="3" fill="var(--ink)"/>
+            <path d="M44 8C38.5 8 34 12.5 34 18C34 25.5 44 36 44 36C44 36 54 25.5 54 18C54 12.5 49.5 8 44 8Z" fill="var(--blaze)"/>
+            <circle cx="44" cy="18" r="5" fill="var(--paper)"/>
+          </svg>
+        </div>
+        <span class="step-num">01</span>
+        <h3>Choose your destination</h3>
+        <p>Search for a building, bus stop, or campus location.</p>
+      </div>
+      <div class="step">
+        <div class="step-visual" aria-hidden="true">
+          <svg viewBox="0 0 56 56">
+            <rect x="2" y="2" width="34" height="14" rx="7" fill="var(--lamp)"/>
+            <circle cx="29" cy="9" r="6" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/>
+            <rect x="2" y="21" width="34" height="14" rx="7" fill="var(--fastblue)"/>
+            <circle cx="29" cy="28" r="6" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/>
+            <rect x="2" y="40" width="34" height="14" rx="7" fill="none" stroke="var(--line)" stroke-width="2"/>
+            <circle cx="9" cy="47" r="6" fill="var(--paper)" stroke="var(--line)" stroke-width="2"/>
+          </svg>
+        </div>
+        <span class="step-num">02</span>
+        <h3>Select what matters</h3>
+        <p>Avoid stairs, stay on lit paths, or plan around crowds or injury.</p>
+      </div>
+      <div class="step">
+        <div class="step-visual" aria-hidden="true">
+          <svg viewBox="0 0 56 56">
+            <rect x="2" y="13" width="52" height="10" rx="5" fill="var(--line)"/>
+            <rect x="2" y="13" width="34" height="10" rx="5" fill="var(--fastblue)" opacity=".65"/>
+            <rect x="2" y="35" width="52" height="10" rx="5" fill="var(--line)"/>
+            <rect x="2" y="35" width="40" height="10" rx="5" fill="var(--good)"/>
+            <circle cx="48" cy="40" r="8" fill="var(--good)"/>
+            <path d="M44.5 40l2.3 2.3l4.7-4.7" stroke="var(--paper)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="step-num">03</span>
+        <h3>Get your route</h3>
+        <p>See the best route for your situation and how it compares to the fastest option.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block center-block">
+  <div class="wrap">
+    <h2 class="wipe">Your destination stays the same. Your route doesn't have to.</h2>
+    <p>Tell us what's going on. Get a route built around it.</p>
+    <button class="btn btn-primary" data-open-login>Plan a route <span class="arrow">→</span></button>
+  </div>
+</section>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-top">
+      <div>
+        <div class="footer-brand">Sherpa</div>
+        <div class="footer-tagline">Routes built around you.</div>
+      </div>
+      <div class="footer-links">
+        <a href="#features">Why it's better</a>
+        <a href="#how">How it works</a>
+        <a href="#">Privacy</a>
+      </div>
+    </div>
+    <div class="footer-bottom">Built at HackGT 2026 · Atlanta, GA</div>
+  </div>
+</footer>
+
+<!-- Login modal -->
+<dialog id="login">
+  <button class="close" aria-label="Close" data-close-login>&times;</button>
+  <h2>Log in</h2>
+  <p>Pick up where you left off.</p>
+  <form id="login-form" novalidate>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" placeholder="you@gatech.edu">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <p class="error" id="login-error"></p>
+    <button class="btn btn-primary" type="submit">Log in <span class="arrow">→</span></button>
+  </form>
+</dialog>
+
+<script src="script.js"></script>
+</body>
+</html>
