@@ -14,6 +14,7 @@ RELAY = "https://bus.gatech.edu/Services/JSONPRelay.svc"
 API_KEY = "8882812681"
 
 ROUTES_TTL = 24 * 3600   # route shapes and stops barely change
+RUNNING_TTL = 60         # which routes are running right now
 VEHICLES_TTL = 3         # bus positions: GT's feed moves each bus about every 4 s
 ARRIVALS_TTL = 30        # arrival predictions, for planning bus trips
 SAMPLE_M = 5             # route lines are sampled every 5 m to place stops along them
@@ -64,10 +65,18 @@ class Routes:
         self.routes = []
 
     def get(self):
+        try:
+            raw = _get("GetRoutesForMapWithScheduleWithEncodedLine", RUNNING_TTL, isDispatch="false")
+        except (requests.RequestException, ValueError):
+            if self.routes:
+                return self.routes   # the feed hiccupped: keep what we knew a minute ago
+            raise
         if time.time() - self.loaded_at > ROUTES_TTL:
-            raw = _get("GetRoutesForMapWithScheduleWithEncodedLine", ROUTES_TTL, isDispatch="false")
             self.routes = [self._build(r) for r in raw if r.get("Stops") and r.get("EncodedPolyline")]
             self.loaded_at = time.time()
+        running = {r["RouteID"]: bool(r.get("IsRunning")) for r in raw}   # rechecked every minute, not once a day
+        for r in self.routes:
+            r["running"] = running.get(r["id"], False)
         return self.routes
 
     def _build(self, r):
@@ -100,7 +109,6 @@ class Routes:
             "id": r["RouteID"],
             "name": r["Description"].strip(),
             "color": r["MapLineColor"],
-            "running": bool(r.get("IsRunning")),
             "line": line,
             "latlng": latlng,
             "stops": [{
