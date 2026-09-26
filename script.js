@@ -48,7 +48,7 @@ let lastReroute = 0;
 let routing = false;
 let voiceOn = true;
 
-let accessible = false;                        // ♿ route around stairs and non-compliant sidewalks
+let accessible = false;                        // route around stairs and non-compliant sidewalks
 const walkSpeed = () => (accessible ? ACCESSIBLE_SPEED : WALK_SPEED);
 const layerOn = { lights: false, buses: false, callboxes: true, ada: false };
 const LAYER_IDS = { lights: ["lights-glow", "lights"], buses: ["bus-routes", "bus-stops"], callboxes: ["callboxes"], ada: ["ada"] };
@@ -264,7 +264,7 @@ async function refreshBuses() {
         if (!marker) {
             const el = document.createElement("div");
             el.className = "bus-marker";
-            el.textContent = "🚌";
+            el.append(icon("bus"));
             el.title = `${v.route} route`;
             marker = new maplibregl.Marker({ element: el }).setLngLat([v.lng, v.lat]).addTo(map);
             busMarkers.set(v.id, marker);
@@ -546,7 +546,7 @@ function showPreview(data, same) {
 
     fillOption("safe", data.safe);
     fillOption("short", data.shortest);
-    $("safe-tag").textContent = accessible ? "♿ Safest" : "Safest";
+    $("safe-tag").replaceChildren(...(accessible ? [icon("accessibility"), "Safest"] : ["Safest"]));
     document.querySelector(".route-option.shortest").style.display = same ? "none" : "";
 
     document.querySelector(".route-option.bus").style.display = data.bus ? "" : "none";
@@ -582,9 +582,7 @@ function fillOption(prefix, route) {
     $(`${prefix}-time`).textContent = formatMins(route.length_m);
     $(`${prefix}-detail`).textContent = details(formatDist(route.length_m), `${pct(route.avg_light)} lit`, `${n} call box${n === 1 ? "" : "es"}`);
 
-    const warning = routeWarning(route);
-    $(`${prefix}-warning`).textContent = warning;
-    $(`${prefix}-warning`).classList.toggle("ok", !warning.startsWith("⚠"));
+    showWarning($(`${prefix}-warning`), routeWarning(route));
 }
 
 function fillBusOption(bus) {
@@ -594,8 +592,7 @@ function fillBusOption(bus) {
     $("bus-detail").textContent = details(bus.route.name, `bus in ${formatSecs(bus.bus_in_s)}`, `${bus.stops} stop${bus.stops === 1 ? "" : "s"}`,
         `${formatDist(bus.walk_m)} walking`, `${n} call box${n === 1 ? "" : "es"}`);
     const warning = routeWarning(bus);
-    $("bus-warning").textContent = warning || `Board at ${bus.board.name}`;
-    $("bus-warning").classList.toggle("ok", !warning.startsWith("⚠"));
+    showWarning($("bus-warning"), warning.text ? warning : { text: `Board at ${bus.board.name}`, problem: false });
 }
 
 // the route object behind each preview option
@@ -619,12 +616,19 @@ function selectOption(name) {
 
 function routeWarning(route) {
     const { steps, no } = route.access_m;
-    if (route.closed_m > 0) return "⚠ Uses a closed sidewalk";
-    if (route.reported_m > 0) return "⚠ Passes a reported problem";
-    if (!accessible) return "";
-    if (steps > 0) return "⚠ Includes stairs";
-    if (no >= 10) return `⚠ ${formatDist(no)} of sidewalk not ADA compliant`;
-    return "No known barriers";
+    const problem = (text) => ({ text, problem: true });
+    if (route.closed_m > 0) return problem("Uses a closed sidewalk");
+    if (route.reported_m > 0) return problem("Passes a reported problem");
+    if (!accessible) return { text: "", problem: false };
+    if (steps > 0) return problem("Includes stairs");
+    if (no >= 10) return problem(`${formatDist(no)} of sidewalk not ADA compliant`);
+    return { text: "No known barriers", problem: false };
+}
+
+// A warning line under a route option: a warning icon for problems, green text otherwise
+function showWarning(el, { text, problem }) {
+    el.replaceChildren(...(problem ? [icon("triangle-alert"), text] : text ? [text] : []));
+    el.classList.toggle("ok", !problem);
 }
 
 $("cancel").addEventListener("click", () => clearTrip());
@@ -740,7 +744,7 @@ function updateProgress() {
     if (!nav.bus && offRouteCount >= OFF_ROUTE_FIXES && !routing && Date.now() - lastReroute > REROUTE_GAP_MS) {
         lastReroute = Date.now();
         offRouteCount = 0;
-        $("turn-arrow").textContent = "↻";
+        $("turn-arrow").replaceChildren(icon("refresh-cw"));
         $("turn-distance").textContent = "Rerouting…";
         $("turn-text").textContent = "Finding a new safe route";
         getRoute(here, lngLatToPoint(dest.getLngLat()), { reroute: true });
@@ -768,7 +772,7 @@ function updateProgress() {
 
 function showStep(step, along, remaining) {
     const arrive = step.type === "arrive";
-    $("turn-arrow").textContent = { arrive: "🏁", board: "🚌", alight: "🚏" }[step.type] ?? ARROWS[step.modifier] ?? "↑";
+    $("turn-arrow").replaceChildren(icon({ arrive: "goal", board: "bus", alight: "footprints" }[step.type] ?? ARROWS[step.modifier] ?? "arrow-up"));
     $("turn-distance").textContent = formatDist(step.along - along);
     $("turn-text").textContent = arrive ? destName ?? "Destination" : step.instruction;
     if (step.type === "board") {
@@ -799,7 +803,7 @@ function arrive() {
     keepAwake(false);
     setMode("arrived");
     nav = null;
-    $("turn-arrow").textContent = "🏁";
+    $("turn-arrow").replaceChildren(icon("goal"));
     $("turn-distance").textContent = "You've arrived";
     $("turn-text").textContent = destName ? `${destName} · accessible entrance` : "Stay safe!";
     $("nav-time").textContent = "Arrived";
@@ -886,7 +890,7 @@ document.addEventListener("visibilitychange", () => {
 // ---- Voice ----
 $("voice").addEventListener("click", () => {
     voiceOn = !voiceOn;
-    $("voice").textContent = voiceOn ? "🔊" : "🔇";
+    $("voice").replaceChildren(icon(voiceOn ? "volume-2" : "volume-x"));
     if (!voiceOn) window.speechSynthesis?.cancel();
 });
 
@@ -1110,10 +1114,10 @@ $("gtpd-call").addEventListener("click", () => $("gtpd-dialog").close());
 // Anyone signed in can report a problem; a second person reporting the same thing nearby confirms it.
 // Confirmed blocked paths and safety concerns are routed around until they expire.
 const REPORT_KINDS = {
-    blocked: { label: "Path blocked", icon: "🚧", hours: 7 * 24, avoidM: 15 },
-    barrier: { label: "Accessibility barrier", icon: "♿", hours: 7 * 24 },
-    light: { label: "Light out", icon: "💡", hours: 7 * 24 },
-    safety: { label: "Safety concern", icon: "⚠️", hours: 1, avoidM: 50 },
+    blocked: { label: "Path blocked", icon: "construction", hours: 7 * 24, avoidM: 15 },
+    barrier: { label: "Accessibility barrier", icon: "accessibility", hours: 7 * 24 },
+    light: { label: "Light out", icon: "lightbulb-off", hours: 7 * 24 },
+    safety: { label: "Safety concern", icon: "triangle-alert", hours: 1, avoidM: 50 },
 };
 const SAME_SPOT_M = 30;          // same kind of report this close together = the same problem
 const REPORTS_REFRESH_MS = 60000;
@@ -1179,7 +1183,7 @@ function drawReports() {
         const kind = REPORT_KINDS[spot.category];
         const el = document.createElement("button");
         el.className = "report-marker" + (spot.confirmed ? " confirmed" : "");
-        el.textContent = kind.icon;
+        el.append(icon(kind.icon));
         el.setAttribute("aria-label", kind.label + (spot.confirmed ? "" : ", not confirmed yet"));
         el.addEventListener("click", (e) => {
             e.stopPropagation();   // don't also route to this spot
@@ -1194,7 +1198,7 @@ function showReport(spot) {
     const el = document.createElement("div");
     const title = document.createElement("strong");
     const info = document.createElement("div");
-    title.textContent = `${kind.icon} ${kind.label}`;
+    title.append(icon(kind.icon), kind.label);
     info.textContent = spot.confirmed ? `Confirmed by ${spot.seen.size} people · ${ago(spot.last)}` : `Reported ${ago(spot.last)} · not confirmed yet`;
     el.append(title, info);
     new maplibregl.Popup({ offset: 18, closeButton: false }).setLngLat([spot.lng, spot.lat]).setDOMContent(el).addTo(map);
@@ -1219,11 +1223,11 @@ function startPlacing(kind) {
     const at = here ?? lngLatToPoint(map.getCenter());
     const el = document.createElement("div");
     el.className = "report-pin";
-    el.textContent = REPORT_KINDS[kind].icon;
+    el.append(icon("map-pin"));
     placing = { kind, marker: new maplibregl.Marker({ element: el, draggable: true, anchor: "bottom" }).setLngLat(toLngLat(at)).addTo(map) };
     following = false;   // don't pull the map away mid-drag
     map.easeTo({ center: toLngLat(at), duration: 500 });
-    $("report-bar-title").textContent = `${REPORT_KINDS[kind].icon} ${REPORT_KINDS[kind].label}`;
+    $("report-bar-title").replaceChildren(icon(REPORT_KINDS[kind].icon), REPORT_KINDS[kind].label);
     $("report-bar").hidden = false;
 }
 
@@ -1284,7 +1288,7 @@ function checkReports(snap) {
         }
     }
     if (ahead.length) {   // one message for everything new, so none gets lost
-        toast(`Reported ahead: ${ahead.map((kind) => `${kind.icon} ${kind.label}`).join(", ")}`);
+        toast(`Reported ahead: ${ahead.map((kind) => kind.label.toLowerCase()).join(", ")}`);
         speak(`${ahead.map((kind) => kind.label).join(" and ")} reported ahead`);
     }
 }
@@ -1292,7 +1296,7 @@ function checkReports(snap) {
 function askStillHere(spot) {
     const kind = REPORT_KINDS[spot.category];
     askingAbout = spot;
-    $("still-here-text").textContent = `${kind.icon} ${kind.label} reported here. Still there?`;
+    $("still-here-text").replaceChildren(icon(kind.icon), `${kind.label} reported here. Still there?`);
     $("still-here").hidden = false;
     clearTimeout(askTimer);
     askTimer = setTimeout(hideStillHere, 20000);   // no answer is fine
@@ -1324,9 +1328,9 @@ function toast(text) {
 
 // ---- Geometry helpers ----
 const ARROWS = {
-    "straight": "↑",
-    "slight left": "↖", "left": "↰", "sharp left": "↺",
-    "slight right": "↗", "right": "↱", "sharp right": "↻",
+    "straight": "arrow-up",
+    "slight left": "arrow-up-left", "left": "corner-up-left", "sharp left": "corner-up-left",
+    "slight right": "arrow-up-right", "right": "corner-up-right", "sharp right": "corner-up-right",
 };
 
 function toLngLat(p) {
@@ -1382,6 +1386,17 @@ function snapToLine(p, line, cum) {
         }
     }
     return best;
+}
+
+// A Lucide icon from the set at the top of index.html
+function icon(name, extraClass = "") {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", `ico ${extraClass}`.trim());
+    svg.setAttribute("aria-hidden", "true");
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    use.setAttribute("href", `#i-${name}`);
+    svg.append(use);
+    return svg;
 }
 
 // ---- Formatting ----

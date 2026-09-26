@@ -22,6 +22,18 @@ html, body {
     inset: 0;
 }
 
+/* Lucide line icons (the set at the top of index.html) */
+.ico {
+    flex: none;
+    width: 1.2em;
+    height: 1.2em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 /* ---- Overlays: which ones show depends on body[data-mode] ---- */
 #top-stack, #nav-banner, #preview-card, #nav-bar {
     position: absolute;
@@ -79,6 +91,15 @@ body[data-mode="arrived"] #nav-bar {
     align-self: stretch;
 }
 
+#search .search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+}
+
 body[data-mode="preview"] #search {
     display: none;
 }
@@ -86,7 +107,7 @@ body[data-mode="preview"] #search {
 #search-input {
     box-sizing: border-box;
     width: 100%;
-    padding: 10px 16px;
+    padding: 10px 16px 10px 46px;   /* room for the search icon */
     font: inherit;
     font-size: 16px;   /* 16px or more stops iOS zooming in on focus */
     border: none;
@@ -147,6 +168,10 @@ button.chip {
     box-shadow: var(--shadow);
 }
 
+#chip-lights .ico    { color: #f9ab00; }
+#chip-callboxes .ico { color: #00a3e0; }
+#chip-ada .ico       { color: #8e24aa; }
+
 button.chip[aria-pressed="true"] {
     background: #e8f0fe;
     color: #174ea6;
@@ -160,8 +185,6 @@ button.chip[aria-pressed="true"] {
     border-radius: 50%;
 }
 
-.key.callbox      { background: #00a3e0; border: 2px solid #003057; width: 8px; height: 8px; }
-.key.ada          { background: #8e24aa; }
 .key.light        { background: #f9ab00; box-shadow: 0 0 0 3px rgba(251, 188, 4, 0.3); }
 .key.light-broken { background: #9aa0a6; }
 
@@ -215,10 +238,15 @@ body[data-lights="true"] #legend > .lights-key {
 }
 
 #turn-arrow {
-    font-size: 2.6rem;
-    line-height: 1;
+    display: flex;
+    justify-content: center;
     width: 48px;
-    text-align: center;
+}
+
+#turn-arrow .ico {
+    width: 44px;
+    height: 44px;
+    stroke-width: 2.5;
 }
 
 #turn-distance {
@@ -281,6 +309,13 @@ body[data-lights="true"] #legend > .lights-key {
     font-weight: 600;
 }
 
+.route-option .warning .ico {
+    width: 1em;
+    height: 1em;
+    margin-right: 4px;
+    vertical-align: -0.15em;
+}
+
 .route-option .warning.ok {
     color: var(--lit);
 }
@@ -303,6 +338,9 @@ body[data-lights="true"] #legend > .lights-key {
 .shortest .swatch { background: repeating-linear-gradient(var(--shortest) 0 6px, transparent 6px 10px); }
 
 .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 0.75rem;
     font-weight: 600;
     padding: 3px 8px;
@@ -356,6 +394,13 @@ button {
     cursor: pointer;
 }
 
+button.primary, button.secondary, button.danger, button.icon, button.floating, a.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
 button.primary   { flex: 2; background: #1a73e8; color: white; font-weight: 600; }
 button.secondary { flex: 1; background: #f1f3f4; color: var(--text); }
 button.danger    { background: #d93025; color: white; font-weight: 600; }
@@ -405,9 +450,9 @@ button.safety-btn {
     box-shadow: var(--shadow);
 }
 
-.safety-btn .icon {
-    font-size: 1.3rem;
-    line-height: 1;
+.safety-btn .ico {
+    width: 24px;
+    height: 24px;
 }
 
 button.safety-btn.report { background: white; color: var(--navy); }
@@ -565,27 +610,44 @@ button.report-marker {
     border: 2px dashed #5f6368;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.85);
-    font-size: 18px;
-    line-height: 1;
+    color: #5f6368;
     box-shadow: var(--shadow);
+}
+
+button.report-marker .ico {
+    width: 18px;
+    height: 18px;
 }
 
 button.report-marker.confirmed {
     border: 2px solid #d93025;
     background: white;
+    color: #d93025;
 }
 
 /* the pin you drag when reporting */
 .report-pin {
-    font-size: 36px;
-    line-height: 1;
+    color: #d93025;
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
     cursor: grab;
 }
 
+.report-pin .ico {
+    width: 42px;
+    height: 42px;
+    fill: white;
+}
+
+#report-bar-title, #still-here-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 #report-kinds button.secondary {
+    justify-content: flex-start;
+    gap: 12px;
     padding: 14px 18px;
-    text-align: left;
 }
 
 #report-bar {
@@ -676,8 +738,14 @@ body[data-mode="nav"] .you .cone {
     border: 2px solid #5f6368;
     border-radius: 50%;
     background: white;
-    font-size: 11px;
-    line-height: 18px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--navy);
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.bus-marker .ico {
+    width: 12px;
+    height: 12px;
 }

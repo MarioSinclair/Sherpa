@@ -15,6 +15,36 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body data-mode="idle" data-accessible="false" data-lights="false">
+    <!-- Icons: Lucide v1.48.0 (lucide.dev, ISC license). Use as <svg class="ico"><use href="#i-name"/></svg> -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="position: absolute; width: 0; height: 0" aria-hidden="true">
+        <symbol id="i-accessibility" viewBox="0 0 24 24"><circle cx="16" cy="4" r="1" /> <path d="m18 19 1-7-6 1" /> <path d="m5 8 3-3 5.5 3-2.36 3.5" /> <path d="M4.24 14.5a5 5 0 0 0 6.88 6" /> <path d="M13.76 17.5a5 5 0 0 0-6.88-6" /></symbol>
+        <symbol id="i-arrow-up-left" viewBox="0 0 24 24"><path d="M7 17V7h10" /> <path d="M17 17 7 7" /></symbol>
+        <symbol id="i-arrow-up-right" viewBox="0 0 24 24"><path d="M7 7h10v10" /> <path d="M7 17 17 7" /></symbol>
+        <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7" /> <path d="M12 19V5" /></symbol>
+        <symbol id="i-bus" viewBox="0 0 24 24"><path d="M8 6v6" /> <path d="M15 6v6" /> <path d="M2 12h19.6" /> <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3" /> <circle cx="7" cy="18" r="2" /> <path d="M9 18h5" /> <circle cx="16" cy="18" r="2" /></symbol>
+        <symbol id="i-construction" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="8" rx="1" /> <path d="M17 14v7" /> <path d="M7 14v7" /> <path d="M17 3v3" /> <path d="M7 3v3" /> <path d="M10 14 2.3 6.3" /> <path d="m14 6 7.7 7.7" /> <path d="m8 6 8 8" /></symbol>
+        <symbol id="i-corner-up-left" viewBox="0 0 24 24"><path d="M20 20v-7a4 4 0 0 0-4-4H4" /> <path d="M9 14 4 9l5-5" /></symbol>
+        <symbol id="i-corner-up-right" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5" /> <path d="M4 20v-7a4 4 0 0 1 4-4h12" /></symbol>
+        <symbol id="i-door-open" viewBox="0 0 24 24"><path d="M10 21H2" /> <path d="M10 3H7a2 2 0 00-2 2v16" /> <path d="M14 12h.01" /> <path d="M19 21V5a2 2 0 00-1.675-1.974l-6.163-1.013A1 1 0 0010 3v18a1 1 0 001.124.992z" /> <path d="M22 21h-3" /></symbol>
+        <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528" /></symbol>
+        <symbol id="i-footprints" viewBox="0 0 24 24"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z" /> <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z" /> <path d="M16 17h4" /> <path d="M4 13h4" /></symbol>
+        <symbol id="i-goal" viewBox="0 0 24 24"><path d="M12 13V2l8 4-8 4" /> <path d="M20.561 10.222a9 9 0 1 1-12.55-5.29" /> <path d="M8.002 9.997a5 5 0 1 0 8.9 2.02" /></symbol>
+        <symbol id="i-lightbulb-off" viewBox="0 0 24 24"><path d="M16.8 11.2c.8-.9 1.2-2 1.2-3.2a6 6 0 0 0-9.3-5" /> <path d="m2 2 20 20" /> <path d="M6.3 6.3a4.67 4.67 0 0 0 1.2 5.2c.7.7 1.3 1.5 1.5 2.5" /> <path d="M9 18h6" /> <path d="M10 22h4" /></symbol>
+        <symbol id="i-lightbulb" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" /> <path d="M9 18h6" /> <path d="M10 22h4" /></symbol>
+        <symbol id="i-locate-fixed" viewBox="0 0 24 24"><line x1="2" x2="5" y1="12" y2="12" /> <line x1="19" x2="22" y1="12" y2="12" /> <line x1="12" x2="12" y1="2" y2="5" /> <line x1="12" x2="12" y1="19" y2="22" /> <circle cx="12" cy="12" r="7" /> <circle cx="12" cy="12" r="3" /></symbol>
+        <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /></symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 5h16" /> <path d="M4 12h16" /> <path d="M4 19h16" /></symbol>
+        <symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></symbol>
+        <symbol id="i-phone" viewBox="0 0 24 24"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" /></symbol>
+        <symbol id="i-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></symbol>
+        <symbol id="i-siren" viewBox="0 0 24 24"><path d="M7 18v-6a5 5 0 1 1 10 0v6" /> <path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z" /> <path d="M21 12h1" /> <path d="M18.5 4.5 18 5" /> <path d="M2 12h1" /> <path d="M12 2v1" /> <path d="m4.929 4.929.707.707" /> <path d="M12 12v6" /></symbol>
+        <symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol>
+        <symbol id="i-volume-2" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /> <path d="M16 9a5 5 0 0 1 0 6" /> <path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></symbol>
+        <symbol id="i-volume-x" viewBox="0 0 24 24"><path d="M11 4.702a.7.7 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.7.7 0 0 0 11 19.298z" /> <path d="m16.5 14.5 5-5" /> <path d="m16.5 9.5 5 5" /></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol>
+    </svg>
+
     <div id="map"></div>
 
     <!-- Idle / preview: title, hint, layer chips -->
@@ -26,17 +56,18 @@
 
         <!-- building search: pick a suggestion, press Enter for the top one, or type a request for the AI -->
         <form id="search" role="search" autocomplete="off">
-            <input id="search-input" type="search" placeholder="🔍  Where to? e.g. “CULC, no stairs”" enterkeyhint="go"
+            <svg class="ico search-icon" aria-hidden="true"><use href="#i-search"/></svg>
+            <input id="search-input" type="search" placeholder="Where to? e.g. “CULC, no stairs”" enterkeyhint="go"
                    aria-label="Where do you want to go?" aria-controls="suggestions">
             <ul id="suggestions" role="listbox" hidden></ul>
         </form>
 
         <div id="chips">
-            <button id="chip-access" class="chip" aria-pressed="false">♿ Accessible route</button>
-            <button id="chip-lights" class="chip" aria-pressed="false"><span class="key light"></span>Lights</button>
-            <button id="chip-buses" class="chip" aria-pressed="false">🚌 Buses</button>
-            <button id="chip-callboxes" class="chip" aria-pressed="true"><span class="key callbox"></span>Call boxes</button>
-            <button id="chip-ada" class="chip" aria-pressed="false"><span class="key ada"></span>ADA entrances</button>
+            <button id="chip-access" class="chip" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-accessibility"/></svg>Accessible route</button>
+            <button id="chip-lights" class="chip" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-lightbulb"/></svg>Lights</button>
+            <button id="chip-buses" class="chip" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-bus"/></svg>Buses</button>
+            <button id="chip-callboxes" class="chip" aria-pressed="true"><svg class="ico" aria-hidden="true"><use href="#i-siren"/></svg>Call boxes</button>
+            <button id="chip-ada" class="chip" aria-pressed="false"><svg class="ico" aria-hidden="true"><use href="#i-door-open"/></svg>ADA entrances</button>
         </div>
 
         <!-- shows the keys for whichever of accessible mode / lights is on -->
@@ -51,7 +82,7 @@
 
     <!-- Navigating: next turn -->
     <section id="nav-banner">
-        <div id="turn-arrow">↑</div>
+        <div id="turn-arrow"><svg class="ico" aria-hidden="true"><use href="#i-arrow-up"/></svg></div>
         <div>
             <div id="turn-distance"></div>
             <div id="turn-text"></div>
@@ -86,11 +117,11 @@
                 <span id="bus-detail" class="detail"></span>
                 <span id="bus-warning" class="warning"></span>
             </div>
-            <span class="tag bus-tag">🚌 Bus</span>
+            <span class="tag bus-tag"><svg class="ico" aria-hidden="true"><use href="#i-bus"/></svg>Bus</span>
         </div>
         <div class="actions">
             <button id="cancel" class="secondary">Cancel</button>
-            <button id="start" class="primary">▶ Start</button>
+            <button id="start" class="primary">Start</button>
         </div>
     </section>
 
@@ -100,17 +131,17 @@
             <strong id="nav-time"></strong>
             <span id="nav-detail"></span>
         </div>
-        <button id="voice" class="icon" title="Voice guidance">🔊</button>
+        <button id="voice" class="icon" title="Voice guidance" aria-label="Voice guidance"><svg class="ico" aria-hidden="true"><use href="#i-volume-2"/></svg></button>
         <button id="end" class="danger">End</button>
     </section>
 
-    <button id="recenter" class="floating" hidden>◎ Recenter</button>
+    <button id="recenter" class="floating" hidden><svg class="ico" aria-hidden="true"><use href="#i-locate-fixed"/></svg>Recenter</button>
 
     <!-- Safety, on screen in every mode: report a problem, text your emergency contact, or call campus police -->
     <div id="safety">
-        <button id="report" class="safety-btn report"><span class="icon" aria-hidden="true">📍</span>Report</button>
-        <button id="unsafe" class="safety-btn unsafe"><span class="icon" aria-hidden="true">💬</span>I feel unsafe</button>
-        <button id="gtpd" class="safety-btn gtpd"><span class="icon" aria-hidden="true">📞</span>GTPD</button>
+        <button id="report" class="safety-btn report"><svg class="ico" aria-hidden="true"><use href="#i-flag"/></svg>Report</button>
+        <button id="unsafe" class="safety-btn unsafe"><svg class="ico" aria-hidden="true"><use href="#i-message-circle"/></svg>I feel unsafe</button>
+        <button id="gtpd" class="safety-btn gtpd"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg>GTPD</button>
     </div>
 
     <!-- Set once; after that "I feel unsafe" texts this person straight away -->
@@ -135,7 +166,7 @@
         <p>Press send in your texting app. The message has your location, your trip and the time.</p>
         <div class="stack">
             <button id="unsafe-again" class="secondary">Send again</button>
-            <button id="unsafe-gtpd" class="danger">📞 Call GTPD</button>
+            <button id="unsafe-gtpd" class="danger"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg>Call GTPD</button>
             <button id="unsafe-done" class="primary">Done</button>
             <button id="unsafe-edit" class="link">Change contact</button>
         </div>
@@ -147,7 +178,7 @@
         <p>404-894-2500, answered 24/7. Calling 911 from a cell phone reaches Atlanta Police instead.</p>
         <div class="actions">
             <button id="gtpd-cancel" class="secondary">Cancel</button>
-            <a id="gtpd-call" class="button danger" href="tel:+14048942500">📞 Call now</a>
+            <a id="gtpd-call" class="button danger" href="tel:+14048942500"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg>Call now</a>
         </div>
     </dialog>
 
@@ -155,10 +186,10 @@
     <dialog id="report-dialog">
         <h2>What's wrong here?</h2>
         <div id="report-kinds" class="stack">
-            <button class="secondary" data-kind="blocked">🚧 Path blocked</button>
-            <button class="secondary" data-kind="barrier">♿ Accessibility barrier</button>
-            <button class="secondary" data-kind="light">💡 Light out</button>
-            <button class="secondary" data-kind="safety">⚠️ Safety concern</button>
+            <button class="secondary" data-kind="blocked"><svg class="ico" aria-hidden="true"><use href="#i-construction"/></svg>Path blocked</button>
+            <button class="secondary" data-kind="barrier"><svg class="ico" aria-hidden="true"><use href="#i-accessibility"/></svg>Accessibility barrier</button>
+            <button class="secondary" data-kind="light"><svg class="ico" aria-hidden="true"><use href="#i-lightbulb-off"/></svg>Light out</button>
+            <button class="secondary" data-kind="safety"><svg class="ico" aria-hidden="true"><use href="#i-triangle-alert"/></svg>Safety concern</button>
             <button id="report-cancel" class="link">Cancel</button>
         </div>
     </dialog>
@@ -180,7 +211,7 @@
         <p>Once someone else confirms it, walkers are routed around this spot for the next hour. If you're in danger or saw a crime, call GTPD.</p>
         <div class="actions">
             <button id="reported-safety-done" class="secondary">Done</button>
-            <button id="reported-safety-gtpd" class="danger">📞 Call GTPD</button>
+            <button id="reported-safety-gtpd" class="danger"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg>Call GTPD</button>
         </div>
     </dialog>
 
