@@ -1121,9 +1121,8 @@ function alertMessage() {
     const lines = [`I feel unsafe and want you to know where I am (${time}, sent from Sherpa).`];
     lines.push(here ? `I'm here: ${mapLink(here)}` : "My phone couldn't get my location.");
     if (dest && (mode === "nav" || mode === "preview")) {
-        const to = `${destName ?? "a spot on the map"} ${mapLink(lngLatToPoint(dest.getLngLat()))}`;
-        const from = mapLink(mode === "nav" ? nav.line[0] : tripStart());
-        lines.push(mode === "nav" ? `I'm walking to ${to}` : `I'm about to walk to ${to}`, `I started at ${from}`);
+        lines.push(`Walking from: ${mapLink(mode === "nav" ? nav.line[0] : tripStart())}`,
+            `Walking to: ${destName ?? "a spot on the map"} ${mapLink(lngLatToPoint(dest.getLngLat()))}`);
         if (mode === "nav" && nav.along != null) {
             lines.push(`I'm ${Math.round((100 * nav.along) / nav.total)}% of the way there, ${formatDist(nav.total - nav.along)} to go.`);
         }
