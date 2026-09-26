@@ -604,7 +604,19 @@ button.report-marker.confirmed {
     font-size: 0.9rem;
 }
 
-#report-bar[hidden], #toast[hidden] {
+/* while navigating, just above the bottom bar */
+#still-here {
+    position: absolute;
+    left: calc(12px + env(safe-area-inset-left));
+    right: calc(12px + env(safe-area-inset-right));
+    bottom: calc(100px + env(safe-area-inset-bottom));
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#report-bar[hidden], #still-here[hidden], #toast[hidden] {
     display: none;
 }
 

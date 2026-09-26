@@ -635,6 +635,9 @@ function clearTrip({ keepStatus = false } = {}) {
     start = dest = destName = routes = nav = null;
     selected = preferred = "safe";
     offRouteCount = 0;
+    alerted.clear();
+    asked.clear();
+    hideStillHere();
     ["shortest", "safe", "bus-walk", "bus-ride", "walked"].forEach((id) => setSource(id, EMPTY));
     if (map.getLayer("callboxes-route")) map.setFilter("callboxes-route", routeCallboxes([]));
     window.speechSynthesis?.cancel();
@@ -724,6 +727,7 @@ function updateProgress() {
     if (remaining < ARRIVED_M || distance(here, lngLatToPoint(dest.getLngLat())) < ARRIVED_M) {
         return arrive();
     }
+    checkReports(snap);
 
     // Off route? Only trust reasonably accurate fixes, and require a few in a row.
     if (snap.dist > OFF_ROUTE_M && accuracy < MAX_ACCURACY_M) offRouteCount++;
@@ -1205,6 +1209,61 @@ $("reported-safety-gtpd").addEventListener("click", () => {
     $("reported-safety").close();
     $("gtpd-dialog").showModal();
 });
+
+// ---- Reports while navigating: a heads-up about ones on your route, and "still there?" as you pass ----
+const ALERT_AHEAD_M = 30;   // reports this close to the route ahead get a heads-up
+const ASK_NEAR_M = 25;      // walking this close to one asks whether it's still there
+const alerted = new Set();  // spots already announced on this trip
+const asked = new Set();    // spots already asked about on this trip
+let askingAbout = null;
+let askTimer = 0;
+
+function checkReports(snap) {
+    const me = user?.id ?? "me";
+    const ahead = [];
+    for (const spot of reportSpots()) {
+        if (!alerted.has(spot.id)) {
+            const onRoute = snapToLine(spot, nav.line, nav.cum);
+            if (onRoute.dist <= ALERT_AHEAD_M && onRoute.along > snap.along) {
+                alerted.add(spot.id);
+                ahead.push(REPORT_KINDS[spot.category]);
+            }
+        }
+        if (!asked.has(spot.id) && !spot.seen.has(me) && distance(here, spot) <= ASK_NEAR_M) {
+            asked.add(spot.id);
+            askStillHere(spot);
+        }
+    }
+    if (ahead.length) {   // one message for everything new, so none gets lost
+        toast(`Reported ahead: ${ahead.map((kind) => `${kind.icon} ${kind.label}`).join(", ")}`);
+        speak(`${ahead.map((kind) => kind.label).join(" and ")} reported ahead`);
+    }
+}
+
+function askStillHere(spot) {
+    const kind = REPORT_KINDS[spot.category];
+    askingAbout = spot;
+    $("still-here-text").textContent = `${kind.icon} ${kind.label} reported here. Still there?`;
+    $("still-here").hidden = false;
+    clearTimeout(askTimer);
+    askTimer = setTimeout(hideStillHere, 20000);   // no answer is fine
+}
+
+function hideStillHere() {
+    $("still-here").hidden = true;
+    askingAbout = null;
+}
+
+function answerStillHere(stillThere) {
+    const spot = askingAbout;
+    hideStillHere();
+    addReport(spot.category, spot, stillThere).then(
+        () => toast(stillThere ? "Thanks, confirmed" : "Thanks, noted"),
+        (err) => toast(`Couldn't send that: ${err.message}`));
+}
+
+$("still-yes").addEventListener("click", () => answerStillHere(true));
+$("still-no").addEventListener("click", () => answerStillHere(false));
 
 let toastTimer = 0;
 function toast(text) {
