@@ -1,5 +1,3 @@
-// ===== Where "Log in" sends people. Change to your app's URL. =====
-const APP_URL = "http://localhost:8000";
 const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ===================================================================
@@ -219,20 +217,6 @@ document.querySelectorAll(".scenario").forEach(btn => {
     document.querySelectorAll(".scenario").forEach(b => b.setAttribute("aria-pressed", b === btn));
     applyScenario(btn.dataset.s);
   });
-});
-
-// Login modal (placeholder auth: any email + password goes to the app)
-const dialog = document.getElementById("login");
-document.querySelectorAll("[data-open-login]").forEach(b => b.addEventListener("click", () => dialog.showModal()));
-document.querySelector("[data-close-login]").addEventListener("click", () => dialog.close());
-document.getElementById("login-form").addEventListener("submit", e => {
-  e.preventDefault();
-  const email = document.getElementById("email").value.trim();
-  const pw = document.getElementById("password").value;
-  const err = document.getElementById("login-error");
-  if (!email.includes("@")) return err.textContent = "Enter a valid email address.";
-  if (!pw) return err.textContent = "Enter your password.";
-  window.location.href = APP_URL;
 });
 
 // Mobile nav toggle
