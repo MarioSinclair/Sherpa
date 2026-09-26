@@ -7,7 +7,8 @@ const map = new maplibregl.Map({
     style: "https://tiles.openfreemap.org/styles/liberty",   // free vector tiles with 3D buildings
     center: toLngLat(CAMPUS_CENTER),
     zoom: 16,
-    maxBounds: [[CAMPUS.west - 0.03, CAMPUS.south - 0.03], [CAMPUS.east + 0.03, CAMPUS.north + 0.03]],
+    minZoom: 14,
+    maxBounds: [[CAMPUS.west - 0.006, CAMPUS.south - 0.006], [CAMPUS.east + 0.006, CAMPUS.north + 0.006]],   // Georgia Tech only
     attributionControl: { compact: true },
 });
 const mapReady = new Promise((resolve) => map.on("load", resolve));
