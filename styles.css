@@ -75,9 +75,18 @@ body[data-mode="arrived"] #nav-bar {
 }
 
 #top-bar h1 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin: 0;
     font-size: 1.1rem;
     color: var(--gold);
+}
+
+.bar-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
 }
 
 #top-bar p {
@@ -621,13 +630,19 @@ a.button.danger {
     width: min(380px, 100%);
     padding: 24px;
     border-radius: 16px;
-    background: white;
+    background: #fbf9ed;   /* the logo's own cream, so the logo blends in */
     box-shadow: var(--shadow);
 }
 
 .signin-card h1 {
-    margin: 0 0 4px;
-    color: var(--navy);
+    margin: 0 0 8px;
+}
+
+.signin-logo {
+    display: block;
+    width: 220px;
+    max-width: 100%;
+    height: auto;
 }
 
 .signin-card p {

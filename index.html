@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Sherpa</title>
+    <link rel="icon" href="logo/favicon.png">
+    <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
     <meta name="theme-color" content="#003057">
     <!-- "Add to Home Screen" opens it full screen, like an app -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -50,7 +52,7 @@
     <!-- Idle / preview: title, hint, layer chips -->
     <div id="top-stack">
         <header id="top-bar">
-            <h1>Sherpa</h1>
+            <h1><img class="bar-logo" src="logo/mark.png" alt="">Sherpa</h1>
             <p id="status">Loading…</p>
             <button id="menu-toggle" class="menu-toggle" aria-expanded="false" aria-controls="chips" aria-label="Map layers"><svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg></button>
         </header>
@@ -230,7 +232,7 @@
     <!-- Sign-in: campus email and password. A new account confirms its email once, with an emailed code. -->
     <section id="signin" hidden>
         <div class="signin-card">
-            <h1>Sherpa</h1>
+            <h1><img class="signin-logo" src="logo/wordmark.png" alt="Sherpa"></h1>
             <p>Safer, accessible walking routes around campus. Sign in with your campus email.</p>
             <p class="credit">Named in honor of the Sherpa people of eastern Nepal, renowned for guiding climbers through the Himalaya.</p>
             <form id="signin-form">
