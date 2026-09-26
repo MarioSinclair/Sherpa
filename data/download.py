@@ -187,7 +187,10 @@ def mapping(lights, sidewalks, callboxes):
     import osmnx as ox, networkx as nx
 
     w, s, e, n = lights.total_bounds                       # only where we have light data
-    G = ox.project_graph(ox.graph_from_bbox((w, s, e, n), network_type="walk"))
+    # osmnx's walk network leaves out every cycleway, but most campus ones are shared paths marked for walking
+    # too (foot=designated), like the path down Clough's west side and Skiles Walkway: add those back
+    walk = [ox._overpass._get_network_filter("walk"), '["highway"="cycleway"]["foot"!~"no"]']
+    G = ox.project_graph(ox.graph_from_bbox((w, s, e, n), network_type="walk", custom_filter=walk))
     edges = ox.graph_to_gdfs(G, nodes=False).reset_index()
 
     edges["light"] = light_score(edges, lights.to_crs(edges.crs))
