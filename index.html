@@ -106,8 +106,9 @@
 
     <button id="recenter" class="floating" hidden>◎ Recenter</button>
 
-    <!-- Safety, on screen in every mode: text your emergency contact, or call campus police -->
+    <!-- Safety, on screen in every mode: report a problem, text your emergency contact, or call campus police -->
     <div id="safety">
+        <button id="report" class="safety-btn report"><span class="icon" aria-hidden="true">📍</span>Report</button>
         <button id="unsafe" class="safety-btn unsafe"><span class="icon" aria-hidden="true">💬</span>I feel unsafe</button>
         <button id="gtpd" class="safety-btn gtpd"><span class="icon" aria-hidden="true">📞</span>GTPD</button>
     </div>
@@ -149,6 +150,41 @@
             <a id="gtpd-call" class="button danger" href="tel:+14048942500">📞 Call now</a>
         </div>
     </dialog>
+
+    <!-- Report: pick what's wrong, then drag the pin to the spot -->
+    <dialog id="report-dialog">
+        <h2>What's wrong here?</h2>
+        <div id="report-kinds" class="stack">
+            <button class="secondary" data-kind="blocked">🚧 Path blocked</button>
+            <button class="secondary" data-kind="barrier">♿ Accessibility barrier</button>
+            <button class="secondary" data-kind="light">💡 Light out</button>
+            <button class="secondary" data-kind="safety">⚠️ Safety concern</button>
+            <button id="report-cancel" class="link">Cancel</button>
+        </div>
+    </dialog>
+
+    <section id="report-bar" class="sheet" hidden>
+        <div>
+            <strong id="report-bar-title"></strong>
+            <span>Drag the pin to the exact spot</span>
+        </div>
+        <div class="actions">
+            <button id="report-bar-cancel" class="secondary">Cancel</button>
+            <button id="report-bar-send" class="primary">Report here</button>
+        </div>
+    </section>
+
+    <!-- After reporting a safety concern -->
+    <dialog id="reported-safety">
+        <h2>Thanks for reporting</h2>
+        <p>Once someone else confirms it, walkers are routed around this spot for the next hour. If you're in danger or saw a crime, call GTPD.</p>
+        <div class="actions">
+            <button id="reported-safety-done" class="secondary">Done</button>
+            <button id="reported-safety-gtpd" class="danger">📞 Call GTPD</button>
+        </div>
+    </dialog>
+
+    <div id="toast" role="status" hidden></div>
 
     <!-- Sign-in: campus email, then the code emailed to it -->
     <section id="signin" hidden>

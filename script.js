@@ -346,6 +346,7 @@ function onFixError(err) {
 
 // ---- Tapping the map ----
 map.on("click", (e) => {
+    if (placing) return;   // dragging a report pin
     const box = [[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]];
     const tapped = (ids) => map.queryRenderedFeatures(box, { layers: ids.filter((id) => map.getLayer(id)) })[0];
 
@@ -507,7 +508,7 @@ function closeSearch() {
 async function getRoute(from, to, { reroute = false } = {}) {
     routing = true;
     try {
-        const res = await api(`/route?from=${from.lat},${from.lng}&to=${to.lat},${to.lng}&accessible=${accessible ? 1 : 0}`);
+        const res = await api(`/route?from=${from.lat},${from.lng}&to=${to.lat},${to.lng}&accessible=${accessible ? 1 : 0}&avoid=${avoidParam()}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         if (!dest) return;   // user cancelled while we were waiting
@@ -619,6 +620,7 @@ function selectOption(name) {
 function routeWarning(route) {
     const { steps, no } = route.access_m;
     if (route.closed_m > 0) return "⚠ Uses a closed sidewalk";
+    if (route.reported_m > 0) return "⚠ Passes a reported problem";
     if (!accessible) return "";
     if (steps > 0) return "⚠ Includes stairs";
     if (no >= 10) return `⚠ ${formatDist(no)} of sidewalk not ADA compliant`;
@@ -854,7 +856,12 @@ fetch("/config")
             const next = session?.user ?? null;
             if (next?.id !== user?.id) {
                 contact = null;
-                if (next) setTimeout(loadContact);   // Supabase says not to await its calls inside this callback
+                reports = [];
+                drawReports();
+                if (next) setTimeout(() => {   // Supabase says not to await its calls inside this callback
+                    loadContact();
+                    loadReports();
+                });
             }
             user = next;
             $("signin").hidden = !!user;
@@ -992,6 +999,167 @@ $("unsafe-gtpd").addEventListener("click", () => {
 $("gtpd").addEventListener("click", () => $("gtpd-dialog").showModal());
 $("gtpd-cancel").addEventListener("click", () => $("gtpd-dialog").close());
 $("gtpd-call").addEventListener("click", () => $("gtpd-dialog").close());
+
+// ---- Crowd reports ----
+// Anyone signed in can report a problem; a second person reporting the same thing nearby confirms it.
+// Confirmed blocked paths and safety concerns are routed around until they expire.
+const REPORT_KINDS = {
+    blocked: { label: "Path blocked", icon: "🚧", hours: 7 * 24, avoidM: 15 },
+    barrier: { label: "Accessibility barrier", icon: "♿", hours: 7 * 24 },
+    light: { label: "Light out", icon: "💡", hours: 7 * 24 },
+    safety: { label: "Safety concern", icon: "⚠️", hours: 1, avoidM: 50 },
+};
+const SAME_SPOT_M = 30;          // same kind of report this close together = the same problem
+const REPORTS_REFRESH_MS = 60000;
+
+let reports = [];                // rows from the last week: { id, user_id, category, lat, lng, still_there, created_at }
+const reportMarkers = [];
+let placing = null;              // { kind, marker } while dropping a new report's pin
+
+async function loadReports() {
+    if (!sb || !user) return;
+    const since = new Date(Date.now() - 7 * 86400000).toISOString();
+    const { data, error } = await sb.from("reports")
+        .select("id, user_id, category, lat, lng, still_there, created_at")
+        .gte("created_at", since);
+    if (error) return;
+    reports = data;
+    drawReports();
+}
+
+setInterval(() => (sb ? loadReports() : drawReports()), REPORTS_REFRESH_MS);   // also drops expired ones
+
+async function addReport(category, at, stillThere = true) {
+    const row = { category, lat: +at.lat.toFixed(6), lng: +at.lng.toFixed(6), still_there: stillThere };
+    if (!sb) {   // no sign-in (local testing): kept on this page only
+        reports.push({ ...row, id: Date.now(), user_id: "me", created_at: new Date().toISOString() });
+        return drawReports();
+    }
+    const { error } = await sb.from("reports").insert(row);
+    if (error) throw new Error(error.message);
+    await loadReports();
+}
+
+// Reports grouped into spots. A spot is active until it expires or two people say it's gone
+// (a newer sighting cancels older "gone" answers); it's confirmed once two different people report it.
+function reportSpots() {
+    const spots = [];
+    for (const r of [...reports].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))) {
+        let spot = spots.find((s) => s.category === r.category && distance(s, r) <= SAME_SPOT_M);
+        if (!spot) spots.push((spot = { id: r.id, category: r.category, lat: r.lat, lng: r.lng, seen: new Set(), gone: new Set(), last: 0 }));
+        if (r.still_there) {
+            spot.seen.add(r.user_id);
+            spot.gone.clear();
+            spot.last = Date.parse(r.created_at);
+        } else {
+            spot.gone.add(r.user_id);
+        }
+    }
+    const now = Date.now();
+    return spots
+        .filter((s) => s.seen.size && s.gone.size < 2 && now - s.last < REPORT_KINDS[s.category].hours * 3600000)
+        .map((s) => ({ ...s, confirmed: s.seen.size >= 2 }));
+}
+
+// Confirmed blocked paths and safety concerns for /route: "lat,lng,radius;..."
+const avoidParam = () => reportSpots()
+    .filter((s) => s.confirmed && REPORT_KINDS[s.category].avoidM)
+    .map((s) => `${s.lat.toFixed(5)},${s.lng.toFixed(5)},${REPORT_KINDS[s.category].avoidM}`)
+    .join(";");
+
+function drawReports() {
+    reportMarkers.splice(0).forEach((m) => m.remove());
+    for (const spot of reportSpots()) {
+        const kind = REPORT_KINDS[spot.category];
+        const el = document.createElement("button");
+        el.className = "report-marker" + (spot.confirmed ? " confirmed" : "");
+        el.textContent = kind.icon;
+        el.setAttribute("aria-label", kind.label + (spot.confirmed ? "" : ", not confirmed yet"));
+        el.addEventListener("click", (e) => {
+            e.stopPropagation();   // don't also route to this spot
+            showReport(spot);
+        });
+        reportMarkers.push(new maplibregl.Marker({ element: el }).setLngLat([spot.lng, spot.lat]).addTo(map));
+    }
+}
+
+function showReport(spot) {
+    const kind = REPORT_KINDS[spot.category];
+    const el = document.createElement("div");
+    const title = document.createElement("strong");
+    const info = document.createElement("div");
+    title.textContent = `${kind.icon} ${kind.label}`;
+    info.textContent = spot.confirmed ? `Confirmed by ${spot.seen.size} people · ${ago(spot.last)}` : `Reported ${ago(spot.last)} · not confirmed yet`;
+    el.append(title, info);
+    new maplibregl.Popup({ offset: 18, closeButton: false }).setLngLat([spot.lng, spot.lat]).setDOMContent(el).addTo(map);
+}
+
+function ago(t) {
+    const mins = Math.round((Date.now() - t) / 60000);
+    if (mins < 60) return `${Math.max(1, mins)} min ago`;
+    return mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
+}
+
+// Report: pick what's wrong, then drag the pin (it starts where you are)
+$("report").addEventListener("click", () => $("report-dialog").showModal());
+$("report-cancel").addEventListener("click", () => $("report-dialog").close());
+document.querySelectorAll("#report-kinds [data-kind]").forEach((button) =>
+    button.addEventListener("click", () => {
+        $("report-dialog").close();
+        startPlacing(button.dataset.kind);
+    }));
+
+function startPlacing(kind) {
+    const at = here ?? lngLatToPoint(map.getCenter());
+    const el = document.createElement("div");
+    el.className = "report-pin";
+    el.textContent = REPORT_KINDS[kind].icon;
+    placing = { kind, marker: new maplibregl.Marker({ element: el, draggable: true, anchor: "bottom" }).setLngLat(toLngLat(at)).addTo(map) };
+    following = false;   // don't pull the map away mid-drag
+    map.easeTo({ center: toLngLat(at), duration: 500 });
+    $("report-bar-title").textContent = `${REPORT_KINDS[kind].icon} ${REPORT_KINDS[kind].label}`;
+    $("report-bar").hidden = false;
+}
+
+function stopPlacing() {
+    placing?.marker.remove();
+    placing = null;
+    $("report-bar").hidden = true;
+    if (mode === "nav") {
+        following = true;
+        if (here) moveCamera(here);
+    }
+}
+
+$("report-bar-cancel").addEventListener("click", stopPlacing);
+$("report-bar-send").addEventListener("click", async () => {
+    const { kind, marker } = placing;
+    $("report-bar-send").disabled = true;
+    try {
+        await addReport(kind, lngLatToPoint(marker.getLngLat()));
+        stopPlacing();
+        if (kind === "safety") $("reported-safety").showModal();
+        else toast(`Thanks, reported: ${REPORT_KINDS[kind].label.toLowerCase()}`);
+    } catch (err) {
+        toast(`Couldn't send the report: ${err.message}`);
+    } finally {
+        $("report-bar-send").disabled = false;
+    }
+});
+
+$("reported-safety-done").addEventListener("click", () => $("reported-safety").close());
+$("reported-safety-gtpd").addEventListener("click", () => {
+    $("reported-safety").close();
+    $("gtpd-dialog").showModal();
+});
+
+let toastTimer = 0;
+function toast(text) {
+    $("toast").textContent = text;
+    $("toast").hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => ($("toast").hidden = true), 5000);
+}
 
 // ---- Geometry helpers ----
 const ARROWS = {

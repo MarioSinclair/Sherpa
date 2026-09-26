@@ -410,6 +410,7 @@ button.safety-btn {
     line-height: 1;
 }
 
+button.safety-btn.report { background: white; color: var(--navy); }
 button.safety-btn.unsafe { background: #b06000; }
 button.safety-btn.gtpd   { background: #d93025; }
 
@@ -553,6 +554,73 @@ a.button.danger {
 
 .signin-card .error:empty {
     display: none;
+}
+
+/* ---- Crowd reports ---- */
+/* on the map: dashed until a second person confirms, then solid red */
+button.report-marker {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 2px dashed #5f6368;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    font-size: 18px;
+    line-height: 1;
+    box-shadow: var(--shadow);
+}
+
+button.report-marker.confirmed {
+    border: 2px solid #d93025;
+    background: white;
+}
+
+/* the pin you drag when reporting */
+.report-pin {
+    font-size: 36px;
+    line-height: 1;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+    cursor: grab;
+}
+
+#report-kinds button.secondary {
+    padding: 14px 18px;
+    text-align: left;
+}
+
+#report-bar {
+    position: absolute;
+    left: calc(12px + env(safe-area-inset-left));
+    right: calc(12px + env(safe-area-inset-right));
+    z-index: 4;   /* over the route card and nav bar while you place the pin */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#report-bar span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+#report-bar[hidden], #toast[hidden] {
+    display: none;
+}
+
+/* short messages ("Thanks, reported…"), over the top bar for a few seconds */
+#toast {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+    right: calc(12px + env(safe-area-inset-right));
+    z-index: 5;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #202124;
+    color: white;
+    font-weight: 600;
+    box-shadow: var(--shadow);
 }
 
 /* ---- You-are-here marker ---- */
