@@ -117,6 +117,8 @@
                 <button id="contact-cancel" type="button" class="secondary">Cancel</button>
                 <button type="submit" class="primary">Save</button>
             </div>
+            <p id="account" class="account" hidden>Signed in as <span id="account-email"></span> ·
+                <button id="signout" type="button" class="link">Sign out</button></p>
         </form>
     </dialog>
 
@@ -142,7 +144,27 @@
         </div>
     </dialog>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Sign-in: campus email, then the code emailed to it. GTPD stays one tap away even here. -->
+    <section id="signin" hidden>
+        <div class="signin-card">
+            <h1>Waypoint</h1>
+            <p>Safer, accessible walking routes around campus. Sign in with your campus email.</p>
+            <form id="signin-email">
+                <label>Campus email <input id="email" type="email" required autocomplete="email" placeholder="you@school.edu"></label>
+                <button type="submit" class="primary">Email me a code</button>
+            </form>
+            <form id="signin-code" hidden>
+                <p>We sent a code to <strong id="signin-sent-to"></strong>.</p>
+                <label>Code <input id="code" required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}"></label>
+                <button type="submit" class="primary">Sign in</button>
+                <button id="signin-back" type="button" class="link">Use a different email</button>
+            </form>
+            <p id="signin-error" class="error" role="alert"></p>
+            <a class="button danger signin-gtpd" href="tel:+14048942500">📞 Call GTPD (campus police)</a>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
     <script src="script.js"></script>
 </body>

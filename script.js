@@ -471,7 +471,7 @@ async function askAI(text) {
     suggestionsEl.hidden = true;
     statusEl.textContent = "Thinking…";
     try {
-        const res = await fetch("/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+        const res = await api("/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
         const settings = await res.json();
         if (!res.ok) throw new Error(settings.error);
         if (!settings.destination) {
@@ -507,7 +507,7 @@ function closeSearch() {
 async function getRoute(from, to, { reroute = false } = {}) {
     routing = true;
     try {
-        const res = await fetch(`/route?from=${from.lat},${from.lng}&to=${to.lat},${to.lng}&accessible=${accessible ? 1 : 0}`);
+        const res = await api(`/route?from=${from.lat},${from.lng}&to=${to.lat},${to.lng}&accessible=${accessible ? 1 : 0}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         if (!dest) return;   // user cancelled while we were waiting
@@ -843,24 +843,90 @@ function speak(text) {
     speechSynthesis.speak(new SpeechSynthesisUtterance(text));
 }
 
+// ---- Sign-in (Supabase): campus email, then a code emailed to it ----
+let sb = null;     // Supabase client; stays null when the server has no Supabase settings (local testing)
+let user = null;   // the signed-in user
+
+fetch("/config")
+    .then((res) => res.json())
+    .then((cfg) => {
+        if (!cfg.supabaseUrl) return;
+        sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+        sb.auth.onAuthStateChange((event, session) => {
+            const next = session?.user ?? null;
+            if (next?.id !== user?.id) {
+                contact = null;
+                if (next) setTimeout(loadContact);   // Supabase says not to await its calls inside this callback
+            }
+            user = next;
+            $("signin").hidden = !!user;
+        });
+    });
+
+// Our server wants the sign-in token; a 401 means the session ended, so ask to sign in again
+async function api(url, options = {}) {
+    const session = sb && (await sb.auth.getSession()).data.session;
+    const headers = { ...options.headers, ...(session && { Authorization: `Bearer ${session.access_token}` }) };
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401 && sb) $("signin").hidden = false;
+    return res;
+}
+
+const signinError = (text) => ($("signin-error").textContent = text);
+
+function showSigninStep(step) {
+    $("signin-email").hidden = step !== "email";
+    $("signin-code").hidden = step !== "code";
+}
+
+$("signin-email").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("email").value.trim().toLowerCase();
+    if (!email.endsWith(".edu")) return signinError("Please use your campus (.edu) email");
+    signinError("");
+    const button = e.target.querySelector("[type=submit]");
+    button.disabled = true;
+    const { error } = await sb.auth.signInWithOtp({ email });
+    button.disabled = false;
+    if (error) return signinError(error.message);
+    $("signin-sent-to").textContent = email;
+    showSigninStep("code");
+    $("code").focus();
+});
+
+$("signin-code").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const button = e.target.querySelector("[type=submit]");
+    button.disabled = true;
+    const { error } = await sb.auth.verifyOtp({ email: $("email").value.trim().toLowerCase(), token: $("code").value.trim(), type: "email" });
+    button.disabled = false;
+    if (error) return signinError(error.message);
+    signinError("");   // the sign-in listener hides the screen; reset it for next time
+    $("code").value = "";
+    showSigninStep("email");
+});
+
+$("signin-back").addEventListener("click", () => {
+    signinError("");
+    showSigninStep("email");
+});
+
 // ---- Safety: "I feel unsafe" and GTPD ----
 // We don't send anything ourselves: the phone's own texting app and dialer do, so the contact sees your number
-let contact = loadContact();   // your emergency contact, kept on this device
-let textAfterSave = false;     // the contact form was opened by "I feel unsafe", so text once it's saved
+let contact = null;          // your emergency contact: loaded from your account, kept here so the button acts instantly
+let textAfterSave = false;   // the contact form was opened by "I feel unsafe", so text once it's saved
 
-function loadContact() {
-    try {
-        return JSON.parse(localStorage.getItem("waypoint-contact"));
-    } catch {
-        return null;
-    }
+async function loadContact() {
+    const { data, error } = await sb.from("contacts").select("name, phone").maybeSingle();
+    if (!error) contact = data;
 }
 
 function saveContact(next) {
     contact = next;
-    try {
-        localStorage.setItem("waypoint-contact", JSON.stringify(next));
-    } catch {}   // private browsing: remembered until the page reloads
+    if (!sb) return;   // no sign-in (local testing): remembered until the page reloads
+    sb.from("contacts")
+        .upsert({ user_id: user.id, ...next, updated_at: new Date().toISOString() })
+        .then(({ error }) => error && (statusEl.textContent = `Couldn't save your contact: ${error.message}`));
 }
 
 $("unsafe").addEventListener("click", () => (contact ? textContact(contact) : editContact({ thenText: true })));
@@ -868,6 +934,8 @@ $("unsafe").addEventListener("click", () => (contact ? textContact(contact) : ed
 function editContact({ thenText = false } = {}) {
     $("contact-name").value = contact?.name ?? "";
     $("contact-phone").value = contact?.phone ?? "";
+    $("account").hidden = !user;
+    $("account-email").textContent = user?.email ?? "";
     textAfterSave = thenText;
     $("contact-dialog").showModal();
 }
@@ -876,6 +944,10 @@ $("contact-cancel").addEventListener("click", () => $("contact-dialog").close())
 $("contact-form").addEventListener("submit", () => {   // method="dialog": the form closes itself
     saveContact({ name: $("contact-name").value.trim(), phone: $("contact-phone").value.trim() });
     if (textAfterSave) textContact(contact);
+});
+$("signout").addEventListener("click", () => {
+    $("contact-dialog").close();
+    sb.auth.signOut();
 });
 
 function textContact(to) {

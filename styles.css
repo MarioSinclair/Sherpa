@@ -424,7 +424,7 @@ dialog label {
     font-weight: 600;
 }
 
-dialog input {
+dialog input, .signin-card input {
     box-sizing: border-box;
     display: block;
     width: 100%;
@@ -461,6 +461,79 @@ a.button.danger {
     background: #d93025;
     color: white;
     font-weight: 600;
+}
+
+.account {
+    margin: 16px 0 0;
+    font-size: 0.85rem;
+}
+
+.account button.link {
+    padding: 0;
+}
+
+/* ---- Sign-in screen: covers the map until you're signed in ---- */
+#signin {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 48, 87, 0.88);   /* GT navy over the map */
+}
+
+#signin[hidden] {
+    display: none;
+}
+
+.signin-card {
+    box-sizing: border-box;
+    width: min(380px, 100%);
+    padding: 24px;
+    border-radius: 16px;
+    background: white;
+    box-shadow: var(--shadow);
+}
+
+.signin-card h1 {
+    margin: 0 0 4px;
+    color: var(--navy);
+}
+
+.signin-card p {
+    margin: 0 0 16px;
+    color: var(--muted);
+}
+
+.signin-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.signin-card form[hidden] {
+    display: none;
+}
+
+.signin-card label {
+    font-weight: 600;
+}
+
+.signin-card .error {
+    margin: 12px 0 0;
+    color: #d93025;
+    font-weight: 600;
+}
+
+.signin-card .error:empty {
+    display: none;
+}
+
+a.button.signin-gtpd {
+    display: flex;
+    margin-top: 20px;
 }
 
 /* ---- You-are-here marker ---- */

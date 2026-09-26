@@ -4,6 +4,7 @@ import time
 
 import networkx as nx
 import osmnx as ox
+import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from pyproj import Transformer
@@ -16,6 +17,8 @@ from data.download import building_names, load_layers, mapping
 load_dotenv()   # API keys from .env when running locally
 if not os.environ.get(assistant.key_name()):
     print(f"WARNING: {assistant.key_name()} isn't set, so AI search is off (building search still works)", flush=True)
+SUPABASE_URL = os.environ.get("SUPABASE_URL")   # unset = no sign-in (local testing)
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")   # the publishable key: safe to hand to the browser
 app = Flask(__name__, static_folder=".", static_url_path="")
 
 print("Building scored walking graph (first run downloads OSM data)...")
@@ -286,9 +289,41 @@ def bus_trip(r, i, j, orig, dest, weight, bus_in, ride_s, speed):
     }
 
 
+# ---- Sign-in ----
+TOKEN_RECHECK_S = 300   # ask Supabase about a token at most every 5 minutes
+checked_tokens = {}     # access token → when Supabase last said it was valid
+
+
+def signed_in():
+    """Whether the request carries a valid Supabase session token (always true without Supabase settings)."""
+    if not SUPABASE_URL:
+        return True
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not token:
+        return False
+    if time.time() - checked_tokens.get(token, 0) < TOKEN_RECHECK_S:
+        return True
+    try:
+        res = requests.get(f"{SUPABASE_URL}/auth/v1/user", timeout=10,
+                           headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {token}"})
+    except requests.RequestException:
+        return False
+    if len(checked_tokens) > 5000:   # tokens expire hourly; don't let the cache grow forever
+        checked_tokens.clear()
+    if res.ok:
+        checked_tokens[token] = time.time()
+    return res.ok
+
+
 @app.get("/")
 def index():
     return send_from_directory(".", "index.html")
+
+
+@app.get("/config")
+def config():
+    """Public settings for the browser (null Supabase settings mean no sign-in)."""
+    return jsonify(supabaseUrl=SUPABASE_URL, supabaseKey=SUPABASE_KEY)
 
 
 @app.get("/bus/routes")
@@ -321,6 +356,8 @@ def bus_vehicles():
 @app.post("/ask")
 def ask():
     """Typed request → route settings from the AI (the search box's fallback when no building name matches)."""
+    if not signed_in():
+        return jsonify(error="Please sign in"), 401
     text = str((request.get_json(silent=True) or {}).get("text") or "").strip()
     if not text:
         return jsonify(error="Type where you want to go"), 400
@@ -333,6 +370,8 @@ def ask():
 
 @app.get("/route")
 def route():
+    if not signed_in():
+        return jsonify(error="Please sign in"), 401
     try:
         (x1, y1), (x2, y2) = parse_point(request.args["from"]), parse_point(request.args["to"])
     except (KeyError, ValueError):
