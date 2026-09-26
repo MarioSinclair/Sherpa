@@ -417,8 +417,8 @@ function showCallbox(feature) {
     const el = document.createElement("div");
     const title = document.createElement("strong");
     const info = document.createElement("div");
-    title.textContent = p.phone_name || "Call box";
-    info.textContent = ["Blue-light emergency phone",
+    title.textContent = p.phone_name || "Blue light emergency tower";
+    info.textContent = ["Blue light emergency tower",
         p.camera === "Yes" && "camera",
         p.blue_light_condition === "light_no" && "light not working"].filter(Boolean).join(" · ");
     el.append(title, info);
@@ -622,7 +622,7 @@ function preferredOption(data, same) {
 function fillOption(prefix, route) {
     const n = route.callboxes.length;
     $(`${prefix}-time`).textContent = formatMins(route.length_m);
-    $(`${prefix}-detail`).textContent = details(formatDist(route.length_m), `${pct(route.avg_light)} lit`, `${n} call box${n === 1 ? "" : "es"}`);
+    $(`${prefix}-detail`).textContent = details(formatDist(route.length_m), `${pct(route.avg_light)} lit`, `${n} emergency tower${n === 1 ? "" : "s"}`);
 
     showWarning($(`${prefix}-warning`), routeWarning(route));
 }
@@ -632,7 +632,7 @@ function fillBusOption(bus) {
     $("bus-swatch").style.background = bus.route.color;
     $("bus-time").textContent = formatSecs(bus.total_s);
     $("bus-detail").textContent = details(bus.route.name, `bus in ${formatSecs(bus.bus_in_s)}`, `${bus.stops} stop${bus.stops === 1 ? "" : "s"}`,
-        `${formatDist(bus.walk_m)} walking`, `${n} call box${n === 1 ? "" : "es"}`);
+        `${formatDist(bus.walk_m)} walking`, `${n} emergency tower${n === 1 ? "" : "s"}`);
     const warning = routeWarning(bus);
     showWarning($("bus-warning"), warning.text ? warning : { text: `Board at ${bus.board.name}`, problem: false });
 }
