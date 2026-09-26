@@ -467,7 +467,7 @@ def bus_vehicles():
     return jsonify([{
         "id": v["VehicleID"],
         "route": routes[v["RouteID"]]["name"] if v["RouteID"] in routes else "Bus",
-        "color": routes[v["RouteID"]]["color"] if v["RouteID"] in routes else "#5f6368",
+        "color": routes[v["RouteID"]]["color"] if v["RouteID"] in routes else "#5C5346",
         "lat": v["Latitude"],
         "lng": v["Longitude"],
         "heading": v["Heading"],

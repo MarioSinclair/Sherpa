@@ -1,19 +1,28 @@
 :root {
-    --navy: #003057;       /* GT navy */
-    --gold: #B3A369;       /* GT gold */
-    --nav-green: #0b6e4f;
-    --text: #1f2328;
-    --muted: #5f6368;
-    --lit: #2e9d4f;
-    --shortest: #80868b;
-    --shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+    /* Sherpa's colours (the same as the landing page); map colours in script.js match */
+    --ink: #14181A;          /* text */
+    --pine: #1F3A34;         /* the brand green: logo, turn banner */
+    --paper: #F6F1E7;        /* cream: top bar, quiet buttons */
+    --blaze: #C1440E;        /* the one accent: buttons, links, what's selected, reports */
+    --blaze-dark: #A8390A;
+    --blaze-soft: #F6E5DD;
+    --good: #2F7D5B;         /* well lit, the right path */
+    --good-soft: #E0EDE6;
+    --lamp: #E8A33D;         /* partly lit, working lights */
+    --danger: #B3261E;       /* dark stretches, stairs, GTPD */
+    --fastblue: #2C5AA0;     /* call boxes and accessibility */
+    --fastblue-soft: #E1E8F2;
+    --muted: #5C5346;        /* secondary text, the shortest route */
+    --line: #E4DCC9;         /* borders */
+    --serif: "Fraunces", Georgia, serif;
+    --shadow: 0 2px 12px rgba(20, 24, 26, 0.25);
 }
 
 html, body {
     height: 100%;
     margin: 0;
-    font-family: system-ui, -apple-system, sans-serif;
-    color: var(--text);
+    font-family: "Public Sans", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
     overflow: hidden;
 }
 
@@ -69,8 +78,8 @@ body[data-mode="arrived"] #nav-bar {
     gap: 12px;
     padding: 10px 16px;
     border-radius: 12px;
-    background: var(--navy);
-    color: white;
+    background: var(--paper);
+    color: var(--ink);
     box-shadow: var(--shadow);
 }
 
@@ -79,8 +88,9 @@ body[data-mode="arrived"] #nav-bar {
     align-items: center;
     gap: 8px;
     margin: 0;
-    font-size: 1.1rem;
-    color: var(--gold);
+    font-family: var(--serif);
+    font-size: 1.25rem;
+    color: var(--pine);
 }
 
 .bar-logo {
@@ -146,7 +156,7 @@ body[data-mode="preview"] #search {
 }
 
 #suggestions li:hover {
-    background: #f1f3f4;
+    background: var(--paper);
 }
 
 /* one row that scrolls sideways on narrow screens */
@@ -173,17 +183,17 @@ button.chip {
     padding: 8px 14px;
     font-size: 0.85rem;
     background: white;
-    color: var(--text);
+    color: var(--ink);
     box-shadow: var(--shadow);
 }
 
-#chip-lights .ico    { color: #f9ab00; }
-#chip-callboxes .ico { color: #00a3e0; }
-#chip-ada .ico       { color: #8e24aa; }
+#chip-lights .ico    { color: var(--lamp); }
+#chip-callboxes .ico { color: var(--fastblue); }
+#chip-ada .ico       { color: var(--fastblue); }
 
 button.chip[aria-pressed="true"] {
-    background: #e8f0fe;
-    color: #174ea6;
+    background: var(--blaze-soft);
+    color: var(--blaze-dark);
     font-weight: 600;
 }
 
@@ -193,7 +203,7 @@ button.menu-toggle {
     margin-left: auto;
     padding: 6px;
     background: none;
-    color: white;
+    color: var(--ink);
 }
 
 button.menu-toggle .ico {
@@ -230,7 +240,7 @@ button.menu-toggle .ico {
         border-radius: 0;
         background: none;
         box-shadow: none;
-        color: var(--text);
+        color: var(--ink);
         font-size: 1rem;
         font-weight: normal;
     }
@@ -242,11 +252,11 @@ button.menu-toggle .ico {
         width: 40px;
         height: 22px;
         border-radius: 999px;
-        background: radial-gradient(circle at 11px 50%, white 8px, transparent 9px) #dadce0;
+        background: radial-gradient(circle at 11px 50%, white 8px, transparent 9px) var(--line);
     }
 
     body[data-menu="open"] button.chip[aria-pressed="true"]::after {
-        background: radial-gradient(circle at 29px 50%, white 8px, transparent 9px) #1a73e8;
+        background: radial-gradient(circle at 29px 50%, white 8px, transparent 9px) var(--blaze);
     }
 }
 
@@ -257,8 +267,8 @@ button.menu-toggle .ico {
     border-radius: 50%;
 }
 
-.key.light        { background: #f9ab00; box-shadow: 0 0 0 3px rgba(251, 188, 4, 0.3); }
-.key.light-broken { background: #9aa0a6; }
+.key.light        { background: var(--lamp); box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.3); }
+.key.light-broken { background: var(--muted); }
 
 #legend {
     display: none;
@@ -293,9 +303,9 @@ body[data-lights="true"] #legend > .lights-key {
     border-radius: 2px;
 }
 
-.key-line.steps  { background: #d93025; }
-.key-line.no     { background: #f29900; }
-.key-line.closed { background: #3c4043; }
+.key-line.steps  { background: var(--danger); }
+.key-line.no     { background: var(--lamp); }
+.key-line.closed { background: var(--ink); }
 
 /* ---- Next-turn banner (nav) ---- */
 #nav-banner {
@@ -304,7 +314,7 @@ body[data-lights="true"] #legend > .lights-key {
     gap: 16px;
     padding: 14px 18px;
     border-radius: 14px;
-    background: var(--nav-green);
+    background: var(--pine);
     color: white;
     box-shadow: var(--shadow);
 }
@@ -359,8 +369,8 @@ body[data-lights="true"] #legend > .lights-key {
 
 /* the option Start will follow */
 .route-option.selected {
-    background: #e8f0fe;
-    box-shadow: inset 0 0 0 2px #1a73e8;
+    background: var(--blaze-soft);
+    box-shadow: inset 0 0 0 2px var(--blaze);
 }
 
 .route-option strong {
@@ -376,7 +386,7 @@ body[data-lights="true"] #legend > .lights-key {
 .route-option .warning {
     display: block;
     margin-top: 2px;
-    color: #b06000;
+    color: var(--danger);
     font-size: 0.85rem;
     font-weight: 600;
 }
@@ -389,7 +399,7 @@ body[data-lights="true"] #legend > .lights-key {
 }
 
 .route-option .warning.ok {
-    color: var(--lit);
+    color: var(--good);
 }
 
 .route-option .warning:empty {
@@ -406,9 +416,9 @@ body[data-lights="true"] #legend > .lights-key {
     border-radius: 3px;
 }
 
-.access .swatch   { background: var(--lit); box-shadow: 0 0 0 2px #1a73e8; }
-.safe .swatch     { background: var(--lit); }
-.shortest .swatch { background: repeating-linear-gradient(var(--shortest) 0 6px, transparent 6px 10px); }
+.access .swatch   { background: var(--good); box-shadow: 0 0 0 2px var(--fastblue); }
+.safe .swatch     { background: var(--good); }
+.shortest .swatch { background: repeating-linear-gradient(var(--muted) 0 6px, transparent 6px 10px); }
 
 .tag {
     display: inline-flex;
@@ -418,23 +428,23 @@ body[data-lights="true"] #legend > .lights-key {
     font-weight: 600;
     padding: 3px 8px;
     border-radius: 999px;
-    background: #e6f4ea;
-    color: var(--lit);
+    background: var(--good-soft);
+    color: var(--good);
 }
 
 .tag.muted {
-    background: #f1f3f4;
+    background: var(--paper);
     color: var(--muted);
 }
 
 .tag.access-tag {
-    background: #e8f0fe;
-    color: #1a73e8;
+    background: var(--fastblue-soft);
+    color: var(--fastblue);
 }
 
 .tag.bus-tag {
-    background: #fef7e0;
-    color: #b06000;
+    background: var(--paper);
+    color: var(--ink);
 }
 
 .actions {
@@ -455,7 +465,7 @@ body[data-lights="true"] #legend > .lights-key {
 #nav-bar strong {
     display: block;
     font-size: 1.3rem;
-    color: var(--nav-green);
+    color: var(--pine);
 }
 
 #nav-bar span {
@@ -479,10 +489,11 @@ button.primary, button.secondary, button.danger, button.icon, button.floating, a
     gap: 6px;
 }
 
-button.primary   { flex: 2; background: #1a73e8; color: white; font-weight: 600; }
-button.secondary { flex: 1; background: #f1f3f4; color: var(--text); }
-button.danger    { background: #d93025; color: white; font-weight: 600; }
-button.icon      { background: #f1f3f4; padding: 10px 12px; }
+button.primary   { flex: 2; background: var(--blaze); color: white; font-weight: 600; }
+button.primary:active { background: var(--blaze-dark); }
+button.secondary { flex: 1; background: var(--paper); color: var(--ink); }
+button.danger    { background: var(--danger); color: white; font-weight: 600; }
+button.icon      { background: var(--paper); padding: 10px 12px; }
 
 button.floating {
     position: absolute;
@@ -490,7 +501,7 @@ button.floating {
     bottom: calc(100px + env(safe-area-inset-bottom));
     z-index: 2;
     background: white;
-    color: #1a73e8;
+    color: var(--blaze);
     font-weight: 600;
     box-shadow: var(--shadow);
 }
@@ -533,9 +544,9 @@ button.safety-btn {
     height: 24px;
 }
 
-button.safety-btn.report { background: white; color: var(--navy); }
-button.safety-btn.unsafe { background: #b06000; }
-button.safety-btn.gtpd   { background: #d93025; }
+button.safety-btn.report { background: white; color: var(--pine); }
+button.safety-btn.unsafe { background: var(--blaze); }
+button.safety-btn.gtpd   { background: var(--danger); }
 
 /* ---- Pop-ups (emergency contact, after "I feel unsafe", call GTPD) ---- */
 dialog {
@@ -553,7 +564,8 @@ dialog::backdrop {
 
 dialog h2 {
     margin: 0 0 8px;
-    font-size: 1.2rem;
+    font-family: var(--serif);
+    font-size: 1.3rem;
 }
 
 dialog p {
@@ -575,7 +587,7 @@ dialog input, .signin-card input {
     padding: 10px 12px;
     font: inherit;
     font-size: 16px;   /* no iOS zoom on focus */
-    border: 1px solid #dadce0;
+    border: 1px solid var(--line);
     border-radius: 10px;
 }
 
@@ -587,7 +599,7 @@ dialog input, .signin-card input {
 
 button.link {
     background: none;
-    color: #1a73e8;
+    color: var(--blaze);
 }
 
 a.button {
@@ -601,7 +613,7 @@ a.button {
 
 a.button.danger {
     flex: 2;
-    background: #d93025;
+    background: var(--danger);
     color: white;
     font-weight: 600;
 }
@@ -624,7 +636,7 @@ a.button.danger {
     align-items: center;
     justify-content: center;
     padding: 16px;
-    background: rgba(0, 48, 87, 0.88);   /* GT navy over the map */
+    background: rgba(31, 58, 52, 0.9);   /* pine over the map */
 }
 
 #signin[hidden] {
@@ -642,6 +654,7 @@ a.button.danger {
 
 .signin-card h1 {
     margin: 0 0 8px;
+    font-family: var(--serif);
 }
 
 .signin-logo {
@@ -677,7 +690,7 @@ a.button.danger {
 
 .signin-card .error {
     margin: 12px 0 0;
-    color: #d93025;
+    color: var(--danger);
     font-weight: 600;
 }
 
@@ -686,15 +699,15 @@ a.button.danger {
 }
 
 /* ---- Crowd reports ---- */
-/* on the map: dashed until a second person confirms, then solid red */
+/* on the map: dashed until a second person confirms, then solid */
 button.report-marker {
     width: 34px;
     height: 34px;
     padding: 0;
-    border: 2px dashed #5f6368;
+    border: 2px dashed var(--muted);
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.85);
-    color: #5f6368;
+    color: var(--muted);
     box-shadow: var(--shadow);
 }
 
@@ -704,9 +717,9 @@ button.report-marker .ico {
 }
 
 button.report-marker.confirmed {
-    border: 2px solid #d93025;
+    border: 2px solid var(--blaze);
     background: white;
-    color: #d93025;
+    color: var(--blaze);
 }
 
 button.remove-report {
@@ -718,7 +731,7 @@ button.remove-report {
 
 /* the pin you drag when reporting */
 .report-pin {
-    color: #d93025;
+    color: var(--blaze);
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
     cursor: grab;
 }
@@ -782,7 +795,7 @@ button.remove-report {
     z-index: 5;
     padding: 14px 16px;
     border-radius: 12px;
-    background: #202124;
+    background: var(--ink);
     color: white;
     font-weight: 600;
     box-shadow: var(--shadow);
@@ -799,7 +812,7 @@ button.remove-report {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: #1a73e8;
+    background: var(--pine);   /* not blue: call boxes are blue dots */
     border: 3px solid white;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15), 0 1px 4px rgba(0, 0, 0, 0.3);
 }
@@ -814,7 +827,7 @@ button.remove-report {
     transform: translateX(-50%);
     border-left: 16px solid transparent;
     border-right: 16px solid transparent;
-    border-bottom: 34px solid rgba(26, 115, 232, 0.25);
+    border-bottom: 34px solid rgba(31, 58, 52, 0.3);
     display: none;
 }
 
@@ -826,13 +839,13 @@ body[data-mode="nav"] .you .cone {
 .bus-marker {
     width: 18px;
     height: 18px;
-    border: 2px solid #5f6368;
+    border: 2px solid var(--muted);
     border-radius: 50%;
     background: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--navy);
+    color: var(--ink);
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 

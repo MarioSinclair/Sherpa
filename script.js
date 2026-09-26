@@ -81,13 +81,13 @@ const tripStart = () => (gpsUsable() ? here : lngLatToPoint(start.getLngLat()));
 
 function idleHint() {
     if (!gpsUsable()) return "Tap the map to set a start point";
-    return layerOn.ada ? "Search, or tap the map or a purple entrance" : "Search for a building or tap the map";
+    return layerOn.ada ? "Search, or tap the map or a blue-ringed entrance" : "Search for a building or tap the map";
 }
 
 // ---- Map layers ----
 const EMPTY = { type: "FeatureCollection", features: [] };
-// route colour by light: 0 = dark (red) → 1 = well lit (green)
-const LIGHT_COLOR = ["interpolate", ["linear"], ["get", "light"], 0, "#d93025", 0.5, "#f9ab00", 1, "#2e9d4f"];
+// route colour by light: 0 = dark (red) → 1 = well lit (green); Sherpa's colours, as in styles.css
+const LIGHT_COLOR = ["interpolate", ["linear"], ["get", "light"], 0, "#B3261E", 0.5, "#E8A33D", 1, "#2F7D5B"];
 // GT "Close" statuses edited longer ago than this are stale and ignored, as in data/download.py
 const CLOSED_RECENT_DAYS = 30;
 
@@ -118,13 +118,13 @@ mapReady.then(() => {
     const working = ["!", ["in", ["get", "CONDITION"], ["literal", ["Poor", "Very Poor"]]]];
     map.addLayer({
         id: "lights-glow", type: "circle", source: "lights", filter: working, layout: { visibility: "none" },
-        paint: { "circle-radius": byZoom(4, 16), "circle-color": "#fbbc04", "circle-opacity": 0.25, "circle-blur": 1 },
+        paint: { "circle-radius": byZoom(4, 16), "circle-color": "#E8A33D", "circle-opacity": 0.25, "circle-blur": 1 },
     }, firstLabel);
     map.addLayer({
         id: "lights", type: "circle", source: "lights", layout: { visibility: "none" },
         paint: {
             "circle-radius": byZoom(1.5, 3.5),
-            "circle-color": ["case", working, "#f9ab00", "#9aa0a6"],
+            "circle-color": ["case", working, "#E8A33D", "#5C5346"],
             "circle-stroke-color": "#ffffff",
             "circle-stroke-width": byZoom(0, 1),
         },
@@ -153,15 +153,15 @@ mapReady.then(() => {
             "line-width": 4,
             "line-opacity": 0.85,
             "line-color": ["case",
-                closedNow, "#3c4043",
-                ["==", ["get", "ADACOMPLY"], "Steps"], "#d93025",
-                "#f29900"],
+                closedNow, "#14181A",
+                ["==", ["get", "ADACOMPLY"], "Steps"], "#B3261E",
+                "#E8A33D"],
         },
     }, firstLabel);
 
     map.addLayer({
         id: "shortest", type: "line", source: "shortest", layout: line,
-        paint: { "line-color": "#80868b", "line-width": 5, "line-opacity": 0.8, "line-dasharray": [1, 1.5] },
+        paint: { "line-color": "#5C5346", "line-width": 5, "line-opacity": 0.8, "line-dasharray": [1, 1.5] },
     }, firstLabel);
     map.addLayer({
         id: "safe-casing", type: "line", source: "safe", layout: line,
@@ -177,7 +177,7 @@ mapReady.then(() => {
     // the step-free route (accessible mode): like the safest, with an accessibility-blue edge
     map.addLayer({
         id: "access-casing", type: "line", source: "access", layout: line,
-        paint: { "line-color": "#1a73e8", "line-width": 11 },
+        paint: { "line-color": "#2C5AA0", "line-width": 11 },
     }, firstLabel);
     map.addLayer({
         id: "access", type: "line", source: "access", layout: line,
@@ -200,7 +200,7 @@ mapReady.then(() => {
 
     map.addLayer({
         id: "walked", type: "line", source: "walked", layout: line,
-        paint: { "line-color": "#9aa0a6", "line-width": 8 },
+        paint: { "line-color": "#D8D1C2", "line-width": 8 },
     }, firstLabel);
 
     // Points go on top of everything so they stay tappable
@@ -208,16 +208,16 @@ mapReady.then(() => {
         id: "ada", type: "circle", source: "ada", minzoom: 14.5, layout: { visibility: "none" },
         // the layer also holds a "Stairs" point and an "ADA Route" note; only show real entrances
         filter: ["in", "entrance", ["downcase", ["concat", ["coalesce", ["get", "Name"], ""], " ", ["coalesce", ["get", "Description"], ""]]]],
-        paint: { "circle-radius": byZoom(2.5, 5.5), "circle-color": "#8e24aa", "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5 },
+        paint: { "circle-radius": byZoom(2.5, 5.5), "circle-color": "#ffffff", "circle-stroke-color": "#2C5AA0", "circle-stroke-width": byZoom(2, 3) },
     });
     map.addLayer({
         id: "callboxes", type: "circle", source: "callboxes", minzoom: 14,
-        paint: { "circle-radius": byZoom(3, 6), "circle-color": "#00a3e0", "circle-stroke-color": "#003057", "circle-stroke-width": byZoom(1, 2) },
+        paint: { "circle-radius": byZoom(3, 6), "circle-color": "#2C5AA0", "circle-stroke-color": "#ffffff", "circle-stroke-width": byZoom(1, 2) },
     });
     // call boxes along the current route, drawn bigger
     map.addLayer({
         id: "callboxes-route", type: "circle", source: "callboxes", filter: routeCallboxes([]),
-        paint: { "circle-radius": byZoom(6, 9), "circle-color": "#00a3e0", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 },
+        paint: { "circle-radius": byZoom(6, 9), "circle-color": "#2C5AA0", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 },
     });
 });
 
@@ -386,7 +386,7 @@ map.on("click", (e) => {
     const at = { lat: lngLat[1], lng: lngLat[0] };
 
     if (!gpsUsable() && !start) {
-        start = new maplibregl.Marker({ color: "#5f6368" }).setLngLat(lngLat).addTo(map);
+        start = new maplibregl.Marker({ color: "#5C5346" }).setLngLat(lngLat).addTo(map);
         statusEl.textContent = "Now search or tap your destination";
         return;
     }
@@ -407,7 +407,7 @@ function setDestination(to, name) {
 function showDoor(data) {
     const at = toLngLat(data.door);
     if (dest) dest.setLngLat(at);
-    else dest = new maplibregl.Marker({ color: "#d93025" }).setLngLat(at).addTo(map);
+    else dest = new maplibregl.Marker({ color: "#C1440E" }).setLngLat(at).addTo(map);
     destName = data.building ?? destName;
     doorKind = data.door.kind;
 }
