@@ -14,6 +14,10 @@
   --serif: "Fraunces", ui-serif, Georgia, serif;
   --sans:  "Public Sans", system-ui, sans-serif;
   --mono:  "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  /* Content width scales gently past typical laptop widths instead of
+     freezing at 1120px, so the page doesn't look tiny/zoomed-out on a
+     big external monitor. */
+  --content-max: clamp(1120px, 82vw, 1440px);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
@@ -26,7 +30,7 @@ body {
 h1, h2, h3 { font-family: var(--serif); color: var(--ink); line-height: 1.05; font-weight: 600; }
 em { font-style: italic; }
 a { color: inherit; }
-.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+.wrap { max-width: var(--content-max); margin: 0 auto; padding: 0 24px; }
 :focus-visible { outline: 2.5px solid var(--blaze); outline-offset: 3px; }
 
 /* A very quiet field of routes behind the whole page — restrained, not decorative noise */
@@ -68,7 +72,7 @@ a { color: inherit; }
 /* Nav — a floating instrument, not a bar */
 nav { position: fixed; top: 16px; left: 0; right: 0; z-index: 40; display: flex; justify-content: center; padding: 0 16px; pointer-events: none; }
 .nav-pill {
-  pointer-events: auto; width: min(1120px, 100%); position: relative;
+  pointer-events: auto; width: min(var(--content-max), 100%); position: relative;
   display: flex; align-items: center; justify-content: space-between; gap: 20px;
   background: rgba(246,241,231,.86); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--line); border-radius: 999px; padding: 8px 8px 8px 22px;
@@ -103,7 +107,7 @@ body.scrolled .nav-pill { box-shadow: 0 18px 36px -16px rgba(20,24,26,.4); }
 /* Hero */
 .hero { padding: 28px 0 88px; }
 .hero .wrap { display: grid; grid-template-columns: 1fr 1.05fr; gap: 56px; align-items: start; }
-.hero h1 { font-size: clamp(40px, 5.6vw, 64px); letter-spacing: -0.01em; margin-bottom: 22px; }
+.hero h1 { font-size: clamp(40px, 5.6vw, 76px); letter-spacing: -0.01em; margin-bottom: 22px; }
 .hero h1 .accent-dot { color: var(--ink); }
 .hero p.lead { font-size: 19px; color: var(--muted); max-width: 30em; margin-bottom: 30px; }
 .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -176,7 +180,7 @@ body.scrolled .nav-pill { box-shadow: 0 18px 36px -16px rgba(20,24,26,.4); }
 
 /* Sections */
 section.block { padding: 88px 0; }
-section.block h2 { font-size: clamp(30px, 4vw, 42px); letter-spacing: -0.01em; }
+section.block h2 { font-size: clamp(30px, 4vw, 46px); letter-spacing: -0.01em; }
 
 /* Why it's better — 3 tight cards, icon + headline + one line, nothing else */
 .benefits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 40px; }
