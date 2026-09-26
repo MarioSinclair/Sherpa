@@ -54,7 +54,7 @@ let voiceOn = true;
 
 let accessible = false;                        // route around stairs and non-compliant sidewalks
 const walkSpeed = () => (accessible ? ACCESSIBLE_SPEED : WALK_SPEED);
-const layerOn = { lights: false, buses: false, callboxes: true, ada: false };
+const layerOn = { lights: false, buses: false, callboxes: false, ada: false };
 const LAYER_IDS = { lights: ["lights-glow", "lights"], buses: ["bus-routes", "bus-stops"], callboxes: ["callboxes"], ada: ["ada"] };
 const LAZY_DATA = { lights: "/data/gt_lights.geojson", buses: "/bus/routes" };   // fetched the first time the chip is turned on
 const loaded = new Set();
@@ -212,7 +212,7 @@ mapReady.then(() => {
         paint: { "circle-radius": byZoom(2.5, 5.5), "circle-color": "#ffffff", "circle-stroke-color": "#2C5AA0", "circle-stroke-width": byZoom(2, 3) },
     });
     map.addLayer({
-        id: "callboxes", type: "circle", source: "callboxes", minzoom: 14,
+        id: "callboxes", type: "circle", source: "callboxes", minzoom: 14, layout: { visibility: "none" },
         paint: { "circle-radius": byZoom(3, 6), "circle-color": "#2C5AA0", "circle-stroke-color": "#ffffff", "circle-stroke-width": byZoom(1, 2) },
     });
     // call boxes along the current route, drawn bigger
