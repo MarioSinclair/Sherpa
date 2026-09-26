@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Sherpa</title>
+    <meta name="theme-color" content="#003057">
+    <!-- "Add to Home Screen" opens it full screen, like an app -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Sherpa">
 
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <link rel="stylesheet" href="styles.css">
@@ -102,8 +108,8 @@
 
     <!-- Safety, on screen in every mode: text your emergency contact, or call campus police -->
     <div id="safety">
-        <button id="unsafe" class="safety-btn unsafe">💬 I feel unsafe</button>
-        <button id="gtpd" class="safety-btn gtpd">📞 GTPD</button>
+        <button id="unsafe" class="safety-btn unsafe"><span class="icon" aria-hidden="true">💬</span>I feel unsafe</button>
+        <button id="gtpd" class="safety-btn gtpd"><span class="icon" aria-hidden="true">📞</span>GTPD</button>
     </div>
 
     <!-- Set once; after that "I feel unsafe" texts this person straight away -->

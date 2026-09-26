@@ -564,7 +564,8 @@ function showPreview(data, same) {
 
     const bounds = new maplibregl.LngLatBounds();
     [...data.safe.line, ...data.shortest.line, ...(data.bus?.line ?? [])].forEach(([lat, lng]) => bounds.extend([lng, lat]));
-    map.fitBounds(bounds, { padding: { top, bottom, left: 40, right: 40 }, pitch: 0, bearing: 0, duration: 800 });
+    const right = $("safety").offsetWidth + 24;   // keep the route clear of the safety buttons
+    map.fitBounds(bounds, { padding: { top, bottom, left: 24, right }, pitch: 0, bearing: 0, duration: 800 });
 }
 
 // The option to pre-select: "fastest" is whichever of the shortest walk and the bus arrives first
@@ -578,8 +579,7 @@ function preferredOption(data, same) {
 function fillOption(prefix, route) {
     const n = route.callboxes.length;
     $(`${prefix}-time`).textContent = formatMins(route.length_m);
-    $(`${prefix}-detail`).textContent =
-        `${formatDist(route.length_m)} · ${pct(route.avg_light)} lit · ${n} call box${n === 1 ? "" : "es"}`;
+    $(`${prefix}-detail`).textContent = details(formatDist(route.length_m), `${pct(route.avg_light)} lit`, `${n} call box${n === 1 ? "" : "es"}`);
 
     const warning = routeWarning(route);
     $(`${prefix}-warning`).textContent = warning;
@@ -590,9 +590,8 @@ function fillBusOption(bus) {
     const n = bus.callboxes.length;
     $("bus-swatch").style.background = bus.route.color;
     $("bus-time").textContent = formatSecs(bus.total_s);
-    $("bus-detail").textContent =
-        `${bus.route.name} · bus in ${formatSecs(bus.bus_in_s)} · ${bus.stops} stop${bus.stops === 1 ? "" : "s"} · ` +
-        `${formatDist(bus.walk_m)} walking · ${n} call box${n === 1 ? "" : "es"}`;
+    $("bus-detail").textContent = details(bus.route.name, `bus in ${formatSecs(bus.bus_in_s)}`, `${bus.stops} stop${bus.stops === 1 ? "" : "s"}`,
+        `${formatDist(bus.walk_m)} walking`, `${n} call box${n === 1 ? "" : "es"}`);
     const warning = routeWarning(bus);
     $("bus-warning").textContent = warning || `Board at ${bus.board.name}`;
     $("bus-warning").classList.toggle("ok", !warning.startsWith("⚠"));
@@ -771,9 +770,8 @@ function showStep(step, along, remaining) {
     const secs = secondsLeft(along, remaining);
     const eta = new Date(Date.now() + secs * 1000);
     $("nav-time").textContent = formatSecs(secs);
-    $("nav-detail").textContent =
-        `${formatDist(remaining)} · ${eta.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ${pct(nav.avgLight)} lit` +
-        (offRouteCount ? " · off route?" : "");
+    $("nav-detail").textContent = details(formatDist(remaining), eta.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+        `${pct(nav.avgLight)} lit`, offRouteCount && "off route?");
 }
 
 // Time left: walking pace, plus on a bus trip the wait for the bus and the scheduled ride
@@ -1058,6 +1056,9 @@ function snapToLine(p, line, cum) {
 }
 
 // ---- Formatting ----
+// "1000 m · 93% lit · 10 call boxes": on a narrow phone it wraps between the parts, never inside one
+const details = (...parts) => parts.filter(Boolean).map((part) => part.replaceAll(" ", "\u00a0")).join(" · ");
+
 function formatDist(m) {
     return m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`;
 }
