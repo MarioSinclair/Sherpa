@@ -1153,10 +1153,12 @@ async function addReport(category, at, stillThere = true) {
 // Reports grouped into spots. A spot is active until it expires or two people say it's gone
 // (a newer sighting cancels older "gone" answers); it's confirmed once two different people report it.
 function reportSpots() {
+    const me = user?.id ?? "me";
     const spots = [];
     for (const r of [...reports].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))) {
         let spot = spots.find((s) => s.category === r.category && distance(s, r) <= SAME_SPOT_M);
-        if (!spot) spots.push((spot = { id: r.id, category: r.category, lat: r.lat, lng: r.lng, seen: new Set(), gone: new Set(), last: 0 }));
+        if (!spot) spots.push((spot = { id: r.id, category: r.category, lat: r.lat, lng: r.lng, seen: new Set(), gone: new Set(), last: 0, mine: [] }));
+        if (r.user_id === me) spot.mine.push(r.id);   // your own rows, which you can remove
         if (r.still_there) {
             spot.seen.add(r.user_id);
             spot.gone.clear();
@@ -1201,7 +1203,35 @@ function showReport(spot) {
     title.append(icon(kind.icon), kind.label);
     info.textContent = spot.confirmed ? `Confirmed by ${spot.seen.size} people · ${ago(spot.last)}` : `Reported ${ago(spot.last)} · not confirmed yet`;
     el.append(title, info);
-    new maplibregl.Popup({ offset: 18, closeButton: false }).setLngLat([spot.lng, spot.lat]).setDOMContent(el).addTo(map);
+    const popup = new maplibregl.Popup({ offset: 18, closeButton: false }).setLngLat([spot.lng, spot.lat]).setDOMContent(el).addTo(map);
+
+    // reported by accident? you can take back your own report (other people's stay)
+    if (spot.mine.length) {
+        const remove = document.createElement("button");
+        remove.className = "link remove-report";
+        remove.textContent = "Remove my report";
+        remove.addEventListener("click", async () => {
+            popup.remove();
+            try {
+                await removeReports(spot.mine);
+                toast("Report removed");
+            } catch (err) {
+                toast(`Couldn't remove it: ${err.message}`);
+            }
+        });
+        el.append(remove);
+    }
+}
+
+async function removeReports(ids) {
+    if (!sb) {   // no sign-in (local testing)
+        reports = reports.filter((r) => !ids.includes(r.id));
+        return drawReports();
+    }
+    const { data, error } = await sb.from("reports").delete().in("id", ids).select("id");
+    if (error) throw new Error(error.message);
+    if (!data.length) throw new Error("the database didn't allow it");   // e.g. the delete rule isn't set up
+    await loadReports();
 }
 
 function ago(t) {

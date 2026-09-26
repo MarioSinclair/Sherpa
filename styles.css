@@ -625,6 +625,13 @@ button.report-marker.confirmed {
     color: #d93025;
 }
 
+button.remove-report {
+    display: block;
+    margin-top: 6px;
+    padding: 4px 0;
+    font-size: 0.9rem;
+}
+
 /* the pin you drag when reporting */
 .report-pin {
     color: #d93025;

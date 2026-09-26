@@ -64,3 +64,9 @@ drop policy if exists "Users add reports as themselves" on public.reports;
 create policy "Users add reports as themselves" on public.reports
   for insert to authenticated
   with check ((select auth.uid()) = user_id);
+
+-- so someone who reports by accident can take it back (only their own)
+drop policy if exists "Users remove their own reports" on public.reports;
+create policy "Users remove their own reports" on public.reports
+  for delete to authenticated
+  using ((select auth.uid()) = user_id);
