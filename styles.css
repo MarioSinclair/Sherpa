@@ -102,7 +102,7 @@ body.scrolled .nav-pill { box-shadow: 0 18px 36px -16px rgba(20,24,26,.4); }
 
 /* Hero */
 .hero { padding: 28px 0 88px; }
-.hero .wrap { display: grid; grid-template-columns: 1fr 1.05fr; gap: 56px; align-items: center; }
+.hero .wrap { display: grid; grid-template-columns: 1fr 1.05fr; gap: 56px; align-items: start; }
 .hero h1 { font-size: clamp(40px, 5.6vw, 64px); letter-spacing: -0.01em; margin-bottom: 22px; }
 .hero h1 .accent-dot { color: var(--ink); }
 .hero p.lead { font-size: 19px; color: var(--muted); max-width: 30em; margin-bottom: 30px; }
