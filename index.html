@@ -18,6 +18,13 @@
             <p id="status">Loading…</p>
         </header>
 
+        <!-- building search: pick a suggestion, or press Enter for the top one -->
+        <form id="search" role="search" autocomplete="off">
+            <input id="search-input" type="search" placeholder="🔍  Search for a building" enterkeyhint="search"
+                   aria-label="Search for a building" aria-controls="suggestions">
+            <ul id="suggestions" role="listbox" hidden></ul>
+        </form>
+
         <div id="chips">
             <button id="chip-access" class="chip" aria-pressed="false">♿ Accessible route</button>
             <button id="chip-lights" class="chip" aria-pressed="false"><span class="key light"></span>Lights</button>

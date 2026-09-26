@@ -72,6 +72,52 @@ body[data-mode="arrived"] #nav-bar {
     font-size: 0.9rem;
 }
 
+/* ---- Building search (idle) ---- */
+#search {
+    position: relative;
+    align-self: stretch;
+}
+
+body[data-mode="preview"] #search {
+    display: none;
+}
+
+#search-input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 10px 16px;
+    font: inherit;
+    font-size: 16px;   /* 16px or more stops iOS zooming in on focus */
+    border: none;
+    border-radius: 999px;
+    background: white;
+    box-shadow: var(--shadow);
+    appearance: none;
+}
+
+#suggestions {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 3;
+    margin: 0;
+    padding: 6px 0;
+    list-style: none;
+    border-radius: 12px;
+    background: white;
+    box-shadow: var(--shadow);
+}
+
+#suggestions li {
+    padding: 10px 16px;
+    cursor: pointer;
+}
+
+#suggestions li:hover {
+    background: #f1f3f4;
+}
+
 /* one row that scrolls sideways on narrow screens */
 #chips {
     display: flex;

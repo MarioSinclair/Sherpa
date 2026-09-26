@@ -74,7 +74,7 @@ const tripStart = () => (gpsUsable() ? here : lngLatToPoint(start.getLngLat()));
 
 function idleHint() {
     if (!gpsUsable()) return "Tap the map to set a start point";
-    return layerOn.ada ? "Tap the map or a purple entrance" : "Tap the map to choose a destination";
+    return layerOn.ada ? "Search, or tap the map or a purple entrance" : "Search for a building or tap the map";
 }
 
 // ---- Map layers ----
@@ -359,15 +359,21 @@ map.on("click", (e) => {
 
     if (!gpsUsable() && !start) {
         start = new maplibregl.Marker({ color: "#5f6368" }).setLngLat(lngLat).addTo(map);
-        statusEl.textContent = "Now tap your destination";
+        statusEl.textContent = "Now search or tap your destination";
         return;
     }
 
-    destName = entrance ? entranceName(entrance.properties) : null;
+    setDestination(lngLat, entrance ? entranceName(entrance.properties) : null);
+});
+
+// lngLat: [lng, lat]; name: the building, when there is one
+function setDestination(lngLat, name) {
+    closeSearch();
+    destName = name;
     dest = new maplibregl.Marker({ color: "#d93025" }).setLngLat(lngLat).addTo(map);
     statusEl.textContent = destName ? `Finding a route to ${destName}…` : "Finding the safest route…";
     getRoute(tripStart(), { lat: lngLat[1], lng: lngLat[0] });
-});
+}
 
 function showCallbox(feature) {
     const p = feature.properties;
@@ -386,15 +392,93 @@ function showCallbox(feature) {
         .addTo(map);
 }
 
-// "153 - ADA Building Entrance - Klaus Advanced Computing" → "Klaus Advanced Computing"
-function entranceName(p) {
-    const name = (p.Description || p.Name || "")
+const entranceName = (p) => buildingName(p) || "Accessible entrance";
+
+// "153 - ADA Building Entrance - Klaus Advanced Computing" → "Klaus Advanced Computing" ("" if there's no name)
+function buildingName(p) {
+    return (p.Description || p.Name || "")
         .replace(/&amp;/g, "&")
         .split(/\s+-\s*|\s*-\s+/)                                  // " - " separators, but keep "Bunger-Henry"
         .map((part) => part.replace(/\bADA\b|\b(Building\s+)?Entrance\b|\bElevator Access\b|=/gi, "").replace(/\s+/g, " ").trim())
         .filter((part) => part && !/^\d+[A-Z]?$/i.test(part))    // building numbers like "153" or "60A"
         .join(" - ");
-    return name || "Accessible entrance";
+}
+
+// ---- Building search ----
+// Every building with an accessible entrance in GT's data; picking one routes to its entrance nearest the start
+const buildings = new Map();   // name → [[lng, lat], ...]
+const isEntrance = (p) => `${p.Name ?? ""} ${p.Description ?? ""}`.toLowerCase().includes("entrance");   // as the map's ADA layer
+const searchInput = $("search-input");
+const suggestionsEl = $("suggestions");
+
+fetch("/data/gt_ada_entrances.geojson")
+    .then((res) => res.json())
+    .then((data) => {
+        for (const f of data.features) {
+            const name = isEntrance(f.properties) && buildingName(f.properties);
+            if (name) buildings.set(name, [...(buildings.get(name) ?? []), f.geometry.coordinates]);
+        }
+        // "Klaus Advanced Computing Building" is the same place as "Klaus Advanced Computing"
+        for (const [name, doors] of buildings) {
+            const short = name.replace(/ Building$/, "");
+            if (short !== name && buildings.has(short)) {
+                buildings.get(short).push(...doors);
+                buildings.delete(name);
+            }
+        }
+    });
+
+// Every word typed must appear in the name; names that start with the first word come first
+function searchBuildings(text) {
+    const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    const matches = [];
+    for (const name of buildings.keys()) {
+        const lower = name.toLowerCase();
+        if (!words.every((w) => lower.includes(w))) continue;
+        const at = lower.indexOf(words[0]);
+        matches.push({ name, rank: at === 0 ? 0 : /\w/.test(lower[at - 1]) ? 2 : 1 });   // name start, word start, mid-word
+    }
+    return matches.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name)).slice(0, 6).map((m) => m.name);
+}
+
+searchInput.addEventListener("input", () => showSuggestions(searchBuildings(searchInput.value)));
+
+function showSuggestions(names) {
+    suggestionsEl.replaceChildren(...names.map((name) => {
+        const item = document.createElement("li");
+        item.textContent = name;
+        item.setAttribute("role", "option");
+        item.addEventListener("click", () => goToBuilding(name));
+        return item;
+    }));
+    suggestionsEl.hidden = !names.length;
+}
+
+// Enter picks the top suggestion
+$("search").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = searchInput.value.trim();
+    const [top] = searchBuildings(text);
+    if (top) goToBuilding(top);
+    else if (text) statusEl.textContent = `No building matches “${text}”`;
+});
+
+function goToBuilding(name) {
+    if (mode !== "idle" || routing) return;
+    if (!gpsUsable() && !start) {
+        statusEl.textContent = "Tap the map to set your start point first";
+        return;
+    }
+    const from = tripStart();
+    const away = ([lng, lat]) => distance(from, { lat, lng });
+    setDestination(buildings.get(name).reduce((a, b) => (away(a) <= away(b) ? a : b)), name);
+}
+
+function closeSearch() {
+    searchInput.value = "";
+    suggestionsEl.hidden = true;
+    searchInput.blur();   // drops the phone keyboard
 }
 
 // ---- Preview: compare the two routes ----
