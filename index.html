@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Waypoint</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-mode="idle" data-accessible="false" data-lights="false">
+    <div id="map"></div>
+
+    <!-- Idle / preview: title, hint, layer chips -->
+    <div id="top-stack">
+        <header id="top-bar">
+            <h1>Waypoint</h1>
+            <p id="status">Loading…</p>
+        </header>
+
+        <div id="chips">
+            <button id="chip-access" class="chip" aria-pressed="false">♿ Accessible route</button>
+            <button id="chip-lights" class="chip" aria-pressed="false"><span class="key light"></span>Lights</button>
+            <button id="chip-buses" class="chip" aria-pressed="false">🚌 Buses</button>
+            <button id="chip-callboxes" class="chip" aria-pressed="true"><span class="key callbox"></span>Call boxes</button>
+            <button id="chip-ada" class="chip" aria-pressed="false"><span class="key ada"></span>ADA entrances</button>
+        </div>
+
+        <!-- shows the keys for whichever of accessible mode / lights is on -->
+        <div id="legend">
+            <span class="access-key"><span class="key-line steps"></span>Stairs</span>
+            <span class="access-key"><span class="key-line no"></span>Not ADA compliant</span>
+            <span class="access-key"><span class="key-line closed"></span>Closed</span>
+            <span class="lights-key"><span class="key light"></span>Streetlight</span>
+            <span class="lights-key"><span class="key light-broken"></span>Broken light</span>
+        </div>
+    </div>
+
+    <!-- Navigating: next turn -->
+    <section id="nav-banner">
+        <div id="turn-arrow">↑</div>
+        <div>
+            <div id="turn-distance"></div>
+            <div id="turn-text"></div>
+        </div>
+    </section>
+
+    <!-- Preview: compare routes, then Start -->
+    <section id="preview-card" class="sheet">
+        <!-- tap a row to choose it; Start follows the chosen one -->
+        <div class="route-option safe" data-option="safe">
+            <span class="swatch"></span>
+            <div>
+                <strong id="safe-time"></strong>
+                <span id="safe-detail" class="detail"></span>
+                <span id="safe-warning" class="warning"></span>
+            </div>
+            <span id="safe-tag" class="tag">Safest</span>
+        </div>
+        <div class="route-option shortest" data-option="shortest">
+            <span class="swatch"></span>
+            <div>
+                <strong id="short-time"></strong>
+                <span id="short-detail" class="detail"></span>
+                <span id="short-warning" class="warning"></span>
+            </div>
+            <span class="tag muted">Shortest</span>
+        </div>
+        <div class="route-option bus" data-option="bus">
+            <span id="bus-swatch" class="swatch"></span>
+            <div>
+                <strong id="bus-time"></strong>
+                <span id="bus-detail" class="detail"></span>
+                <span id="bus-warning" class="warning"></span>
+            </div>
+            <span class="tag bus-tag">🚌 Bus</span>
+        </div>
+        <div class="actions">
+            <button id="cancel" class="secondary">Cancel</button>
+            <button id="start" class="primary">▶ Start</button>
+        </div>
+    </section>
+
+    <!-- Navigating: time / distance / ETA -->
+    <section id="nav-bar" class="sheet">
+        <div>
+            <strong id="nav-time"></strong>
+            <span id="nav-detail"></span>
+        </div>
+        <button id="voice" class="icon" title="Voice guidance">🔊</button>
+        <button id="end" class="danger">End</button>
+    </section>
+
+    <button id="recenter" class="floating" hidden>◎ Recenter</button>
+
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+:root {
+    --navy: #003057;       /* GT navy */
+    --gold: #B3A369;       /* GT gold */
+    --nav-green: #0b6e4f;
+    --text: #1f2328;
+    --muted: #5f6368;
+    --lit: #2e9d4f;
+    --shortest: #80868b;
+    --shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    overflow: hidden;
+}
+
+#map {
+    position: absolute;
+    inset: 0;
+}
+
+/* ---- Overlays: which ones show depends on body[data-mode] ---- */
+#top-stack, #nav-banner, #preview-card, #nav-bar {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    z-index: 2;
+    display: none;
+}
+
+body[data-mode="idle"] #top-stack,
+body[data-mode="preview"] #top-stack,
+body[data-mode="preview"] #preview-card,
+body[data-mode="nav"] #nav-banner,
+body[data-mode="nav"] #nav-bar,
+body[data-mode="arrived"] #nav-banner,
+body[data-mode="arrived"] #nav-bar {
+    display: flex;
+}
+
+/* ---- Top bar, chips and legend (idle / preview) ---- */
+#top-stack {
+    top: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+#top-bar {
+    display: flex;
+    align-self: stretch;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: var(--navy);
+    color: white;
+    box-shadow: var(--shadow);
+}
+
+#top-bar h1 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--gold);
+}
+
+#top-bar p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* one row that scrolls sideways on narrow screens */
+#chips {
+    display: flex;
+    align-self: stretch;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px 2px 8px;   /* room for the chip shadows */
+    margin-bottom: -6px;
+}
+
+#chips::-webkit-scrollbar {
+    display: none;
+}
+
+button.chip {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    background: white;
+    color: var(--text);
+    box-shadow: var(--shadow);
+}
+
+button.chip[aria-pressed="true"] {
+    background: #e8f0fe;
+    color: #174ea6;
+    font-weight: 600;
+}
+
+/* map-symbol keys: match the circle / line colours in script.js */
+.key {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.key.callbox      { background: #00a3e0; border: 2px solid #003057; width: 8px; height: 8px; }
+.key.ada          { background: #8e24aa; }
+.key.light        { background: #f9ab00; box-shadow: 0 0 0 3px rgba(251, 188, 4, 0.3); }
+.key.light-broken { background: #9aa0a6; }
+
+#legend {
+    display: none;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: var(--shadow);
+}
+
+body[data-accessible="true"] #legend,
+body[data-lights="true"] #legend {
+    display: flex;
+}
+
+#legend > span {
+    display: none;
+    align-items: center;
+    gap: 5px;
+}
+
+body[data-accessible="true"] #legend > .access-key,
+body[data-lights="true"] #legend > .lights-key {
+    display: inline-flex;
+}
+
+.key-line {
+    width: 16px;
+    height: 4px;
+    border-radius: 2px;
+}
+
+.key-line.steps  { background: #d93025; }
+.key-line.no     { background: #f29900; }
+.key-line.closed { background: #3c4043; }
+
+/* ---- Next-turn banner (nav) ---- */
+#nav-banner {
+    top: 12px;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: var(--nav-green);
+    color: white;
+    box-shadow: var(--shadow);
+}
+
+#turn-arrow {
+    font-size: 2.6rem;
+    line-height: 1;
+    width: 48px;
+    text-align: center;
+}
+
+#turn-distance {
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+#turn-text {
+    font-size: 1.05rem;
+    opacity: 0.95;
+}
+
+/* ---- Bottom sheets (preview / nav) ---- */
+.sheet {
+    bottom: 12px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: white;
+    box-shadow: var(--shadow);
+}
+
+#preview-card {
+    flex-direction: column;
+    gap: 10px;
+}
+
+.route-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 -8px;
+    padding: 6px 8px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+/* the option Start will follow */
+.route-option.selected {
+    background: #e8f0fe;
+    box-shadow: inset 0 0 0 2px #1a73e8;
+}
+
+.route-option strong {
+    display: block;
+    font-size: 1.1rem;
+}
+
+.route-option .detail {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.route-option .warning {
+    display: block;
+    margin-top: 2px;
+    color: #b06000;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.route-option .warning.ok {
+    color: var(--lit);
+}
+
+.route-option .warning:empty {
+    display: none;
+}
+
+.route-option > div {
+    flex: 1;
+}
+
+.swatch {
+    width: 6px;
+    height: 36px;
+    border-radius: 3px;
+}
+
+.safe .swatch     { background: var(--lit); }
+.shortest .swatch { background: repeating-linear-gradient(var(--shortest) 0 6px, transparent 6px 10px); }
+
+.tag {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #e6f4ea;
+    color: var(--lit);
+}
+
+.tag.muted {
+    background: #f1f3f4;
+    color: var(--muted);
+}
+
+.tag.bus-tag {
+    background: #fef7e0;
+    color: #b06000;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+#nav-bar {
+    align-items: center;
+    gap: 12px;
+}
+
+#nav-bar > div {
+    flex: 1;
+}
+
+#nav-bar strong {
+    display: block;
+    font-size: 1.3rem;
+    color: var(--nav-green);
+}
+
+#nav-bar span {
+    color: var(--muted);
+}
+
+/* ---- Buttons ---- */
+button {
+    font: inherit;
+    border: none;
+    border-radius: 999px;
+    padding: 10px 18px;
+    cursor: pointer;
+}
+
+button.primary   { flex: 2; background: #1a73e8; color: white; font-weight: 600; }
+button.secondary { flex: 1; background: #f1f3f4; color: var(--text); }
+button.danger    { background: #d93025; color: white; font-weight: 600; }
+button.icon      { background: #f1f3f4; padding: 10px 12px; }
+
+button.floating {
+    position: absolute;
+    right: 12px;
+    bottom: 100px;
+    z-index: 2;
+    background: white;
+    color: #1a73e8;
+    font-weight: 600;
+    box-shadow: var(--shadow);
+}
+
+button[hidden] {
+    display: none;
+}
+
+/* ---- You-are-here marker ---- */
+.you {
+    width: 22px;
+    height: 22px;
+    position: relative;
+}
+
+.you .dot {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: #1a73e8;
+    border: 3px solid white;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15), 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* direction cone, shown while navigating */
+.you .cone {
+    position: absolute;
+    left: 50%;
+    bottom: 50%;
+    width: 0;
+    height: 0;
+    transform: translateX(-50%);
+    border-left: 16px solid transparent;
+    border-right: 16px solid transparent;
+    border-bottom: 34px solid rgba(26, 115, 232, 0.25);
+    display: none;
+}
+
+body[data-mode="nav"] .you .cone {
+    display: block;
+}
+
+/* ---- Live bus markers (border = route colour, set in script.js) ---- */
+.bus-marker {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #5f6368;
+    border-radius: 50%;
+    background: white;
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
