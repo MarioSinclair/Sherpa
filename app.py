@@ -572,7 +572,7 @@ def route():
 
 def plan_walks(orig, targets, accessible, avoid, added, building):
     """The safest and shortest walks (plus the step-free one and a bus trip when they apply) to the best door."""
-    weight = "cost_access" if accessible else "cost"   # the route the door is chosen for
+    weight = "cost_access" if accessible else "cost"   # the main route: step-free in accessible mode, otherwise safest
     speed = ACCESSIBLE_SPEED if accessible else WALK_SPEED
 
     doors = {}
@@ -583,32 +583,41 @@ def plan_walks(orig, targets, accessible, avoid, added, building):
     if not doors:
         return jsonify(error="That point is too far from campus paths"), 400
 
-    # the door the main route reaches most cheaply: route to a temporary node joined to every door at no cost
-    sink = next(new_ids)
-    G.add_node(sink, x=0, y=0)
-    G.add_edges_from((node, sink, {"length": 0, "cost": 0, "cost_access": 0}) for node in doors)
-    main = ox.shortest_path(G, orig, sink, weight=cost(weight, avoid))
-    G.remove_node(sink)
-    if main is None:
+    # the door: the one whose main route is the shortest walk, so a door across the building never costs minutes;
+    # a door only reachable past a closed or reported path (or, step-free, stairs) loses to one that isn't
+    _, paths = nx.single_source_dijkstra(G, orig, weight=cost(weight, avoid))
+
+    def walk(nodes):   # (has a problem it can't avoid, metres)
+        problem, metres = False, 0.0
+        for u, v in zip(nodes, nodes[1:]):
+            k, e = min(G[u][v].items(), key=lambda item: item[1]["length"])
+            problem |= bool(e["closed"]) or (u, v, k) in avoid or (accessible and e["access"] in ("no", "steps"))
+            metres += e["length"]
+        return problem, metres
+
+    reached = [node for node in doors if node in paths]
+    if not reached:
         return jsonify(error="No walking route between those points"), 404
-    main.pop()
-    dest = main[-1]
+    dest = min(reached, key=lambda node: walk(paths[node]))
     if dest == orig:
         return jsonify(error="You're already there"), 400
 
+    main = paths[dest]
     safe = main if weight == "cost" else ox.shortest_path(G, orig, dest, weight=cost("cost", avoid))
-    short = ox.shortest_path(G, orig, dest, weight=cost("length", avoid))
+    short = main if weight == "length" else ox.shortest_path(G, orig, dest, weight=cost("length", avoid))
     safe_route = route_summary(safe, "cost", avoid)
-    access_route = route_summary(main, "cost_access", avoid) if accessible else None
+    short_route = route_summary(short, "length", avoid)
+    access_route = route_summary(main, weight, avoid) if accessible else None
+    main_route = access_route or (short_route if weight == "length" else safe_route)
     try:
-        bus = plan_bus(orig, dest, weight, (access_route or safe_route)["length_m"], speed, avoid)
+        bus = plan_bus(orig, dest, weight, main_route["length_m"], speed, avoid)
     except Exception as err:   # the bus feed is a bonus: never let it break walking directions
         print("bus planning skipped:", repr(err))
         bus = None
 
     x, y, kind = doors[dest]
     lat, lng = to_latlng((x, y))
-    return jsonify(safe=safe_route, shortest=route_summary(short, "length", avoid), access=access_route, bus=bus,
+    return jsonify(safe=safe_route, shortest=short_route, access=access_route, bus=bus,
                    accessible=accessible, building=building, door={"lat": lat, "lng": lng, "kind": kind})
 
 
