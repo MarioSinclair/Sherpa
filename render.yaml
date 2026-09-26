@@ -1,9 +1,9 @@
-# Render Blueprint: dashboard → New → Blueprint → pick the Waypoint repo.
+# Render Blueprint: dashboard → New → Blueprint → pick the Sherpa repo.
 # Render redeploys every time main changes.
 # Secrets (sync: false) are typed into the dashboard, never committed.
 services:
   - type: web
-    name: waypoint
+    name: sherpa
     runtime: python
     plan: free           # sleeps after 15 min without visitors; the next visit takes about a minute to wake it
     branch: main

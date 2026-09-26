@@ -517,6 +517,11 @@ a.button.danger {
     display: none;
 }
 
+.signin-card p.credit {
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
 .signin-card label {
     font-weight: 600;
 }

@@ -1,4 +1,4 @@
--- Waypoint database setup. Paste into Supabase → SQL Editor → Run. Safe to run again.
+-- Sherpa database setup. Paste into Supabase → SQL Editor → Run. Safe to run again.
 
 -- ---- Sign-up: campus (.edu) emails only ----
 -- Enable it afterwards: Authentication → Hooks → "Before User Created" → Postgres → public.hook_edu_only
