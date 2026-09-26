@@ -18,10 +18,10 @@
             <p id="status">Loading…</p>
         </header>
 
-        <!-- building search: pick a suggestion, or press Enter for the top one -->
+        <!-- building search: pick a suggestion, press Enter for the top one, or type a request for the AI -->
         <form id="search" role="search" autocomplete="off">
-            <input id="search-input" type="search" placeholder="🔍  Search for a building" enterkeyhint="search"
-                   aria-label="Search for a building" aria-controls="suggestions">
+            <input id="search-input" type="search" placeholder="🔍  Where to? e.g. “CULC, no stairs”" enterkeyhint="go"
+                   aria-label="Where do you want to go?" aria-controls="suggestions">
             <ul id="suggestions" role="listbox" hidden></ul>
         </form>
 

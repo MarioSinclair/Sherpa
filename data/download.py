@@ -59,6 +59,23 @@ def load_layers():
     return {name: gpd.read_file(path(name)) for name in LAYERS}
 
 
+def building_names(entrances):
+    """Names of the buildings in the ADA entrance layer, cleaned like buildingName() in script.js."""
+    import re
+
+    text = lambda x: x if isinstance(x, str) else ""
+    names = set()
+    for name, desc in zip(entrances["Name"], entrances["Description"]):
+        if "entrance" not in f"{text(name)} {text(desc)}".lower():      # the layer also holds stairs and notes
+            continue
+        parts = re.split(r"\s+-\s*|\s*-\s+", (text(desc) or text(name)).replace("&amp;", "&"))
+        parts = [re.sub(r"\s+", " ", re.sub(r"\bADA\b|\b(Building\s+)?Entrance\b|\bElevator Access\b|=", "", p, flags=re.I)).strip()
+                 for p in parts]
+        names.add(" - ".join(p for p in parts if p and not re.fullmatch(r"\d+[A-Z]?", p, re.I)))
+    # "Klaus Advanced Computing Building" is the same place as "Klaus Advanced Computing"
+    return sorted(n for n in names if n and not (n.endswith(" Building") and n[:-len(" Building")] in names))
+
+
 def check():
     import osmnx as ox
 

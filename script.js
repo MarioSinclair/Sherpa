@@ -39,6 +39,7 @@ let dest = null;          // destination marker
 let destName = null;      // building name when the destination is an ADA entrance
 let routes = null;        // last /route response
 let selected = "safe";    // which option in the preview card: "safe", "shortest" or "bus"
+let preferred = "safe";   // what to pre-select when routes arrive; the AI can ask for "fastest" or "bus"
 
 let nav = null;           // { line, cum, total, steps, avgLight, spoken } while navigating
 let following = true;
@@ -455,21 +456,42 @@ function showSuggestions(names) {
     suggestionsEl.hidden = !names.length;
 }
 
-// Enter picks the top suggestion
+// Enter picks the top suggestion; anything that isn't a building name goes to the AI
 $("search").addEventListener("submit", (e) => {
     e.preventDefault();
     const text = searchInput.value.trim();
     const [top] = searchBuildings(text);
     if (top) goToBuilding(top);
-    else if (text) statusEl.textContent = `No building matches “${text}”`;
+    else if (text) askAI(text);
 });
 
-function goToBuilding(name) {
+// "tech tower, I use a wheelchair" → Evans Administration, accessible mode on
+async function askAI(text) {
+    if (mode !== "idle" || routing) return;
+    suggestionsEl.hidden = true;
+    statusEl.textContent = "Thinking…";
+    try {
+        const res = await fetch("/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+        const settings = await res.json();
+        if (!res.ok) throw new Error(settings.error);
+        if (!settings.destination) {
+            statusEl.textContent = `Couldn't find a building in “${text}”`;
+            return;
+        }
+        if (settings.accessible && !accessible) setAccessible(true);   // never switches it off for you
+        goToBuilding(settings.destination, settings.mode);
+    } catch (err) {
+        statusEl.textContent = err.message;
+    }
+}
+
+function goToBuilding(name, pick = "safe") {
     if (mode !== "idle" || routing) return;
     if (!gpsUsable() && !start) {
         statusEl.textContent = "Tap the map to set your start point first";
         return;
     }
+    preferred = pick;
     const from = tripStart();
     const away = ([lng, lat]) => distance(from, { lat, lng });
     setDestination(buildings.get(name).reduce((a, b) => (away(a) <= away(b) ? a : b)), name);
@@ -528,7 +550,9 @@ function showPreview(data, same) {
 
     document.querySelector(".route-option.bus").style.display = data.bus ? "" : "none";
     if (data.bus) fillBusOption(data.bus);
-    selectOption("safe");
+    const option = preferredOption(data, same);
+    selectOption(option);
+    if (preferred === "bus" && option !== "bus") statusEl.textContent = "No bus right now, so here's the safest walk";
     refreshBuses();
 
     // fit both routes into the space between the top chips and the bottom card
@@ -541,6 +565,14 @@ function showPreview(data, same) {
     const bounds = new maplibregl.LngLatBounds();
     [...data.safe.line, ...data.shortest.line, ...(data.bus?.line ?? [])].forEach(([lat, lng]) => bounds.extend([lng, lat]));
     map.fitBounds(bounds, { padding: { top, bottom, left: 40, right: 40 }, pitch: 0, bearing: 0, duration: 800 });
+}
+
+// The option to pre-select: "fastest" is whichever of the shortest walk and the bus arrives first
+function preferredOption(data, same) {
+    if (preferred === "bus" && data.bus) return "bus";
+    if (preferred !== "fastest") return "safe";
+    if (data.bus && data.bus.total_s < data.shortest.length_m / walkSpeed()) return "bus";
+    return same ? "safe" : "shortest";
 }
 
 function fillOption(prefix, route) {
@@ -600,7 +632,7 @@ $("end").addEventListener("click", () => clearTrip());
 function clearTrip({ keepStatus = false } = {}) {
     [start, dest].forEach((m) => m && m.remove());
     start = dest = destName = routes = nav = null;
-    selected = "safe";
+    selected = preferred = "safe";
     offRouteCount = 0;
     ["shortest", "safe", "bus-walk", "bus-ride", "walked"].forEach((id) => setSource(id, EMPTY));
     if (map.getLayer("callboxes-route")) map.setFilter("callboxes-route", routeCallboxes([]));

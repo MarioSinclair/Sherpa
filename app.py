@@ -1,15 +1,21 @@
 import math
+import os
 import time
 
 import networkx as nx
 import osmnx as ox
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from pyproj import Transformer
 from shapely.geometry import LineString
 
 import buses
-from data.download import load_layers, mapping
+import assistant
+from data.download import building_names, load_layers, mapping
 
+load_dotenv()   # API keys from .env when running locally
+if not os.environ.get(assistant.key_name()):
+    print(f"WARNING: {assistant.key_name()} isn't set, so AI search is off (building search still works)", flush=True)
 app = Flask(__name__, static_folder=".", static_url_path="")
 
 print("Building scored walking graph (first run downloads OSM data)...")
@@ -19,6 +25,7 @@ callboxes = layers["callboxes"].to_crs(G.graph["crs"])
 to_graph = Transformer.from_crs("EPSG:4326", G.graph["crs"], always_xy=True)
 to_wgs84 = Transformer.from_crs(G.graph["crs"], "EPSG:4326", always_xy=True)
 print(G.number_of_edges(), "edges ready")
+buildings = building_names(layers["ada_entrances"])   # for the AI; the browser builds the same list for search
 
 
 bus_routes = buses.Routes(to_graph, to_wgs84)
@@ -309,6 +316,19 @@ def bus_vehicles():
         "lng": v["Longitude"],
         "heading": v["Heading"],
     } for v in buses.vehicles()])
+
+
+@app.post("/ask")
+def ask():
+    """Typed request → route settings from the AI (the search box's fallback when no building name matches)."""
+    text = str((request.get_json(silent=True) or {}).get("text") or "").strip()
+    if not text:
+        return jsonify(error="Type where you want to go"), 400
+    try:
+        return jsonify(assistant.route_settings(text, buildings))
+    except Exception as err:   # the AI is a bonus: building search works without it
+        print("AI failed:", repr(err), flush=True)
+        return jsonify(error="Couldn't understand that. Try a building name"), 502
 
 
 @app.get("/route")
