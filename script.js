@@ -642,6 +642,7 @@ function clearTrip({ keepStatus = false } = {}) {
     if (map.getLayer("callboxes-route")) map.setFilter("callboxes-route", routeCallboxes([]));
     window.speechSynthesis?.cancel();
 
+    keepAwake(false);
     setMode("idle");
     refreshBuses();
     if (!keepStatus) statusEl.textContent = idleHint();
@@ -669,6 +670,7 @@ $("start").addEventListener("click", () => {
     speak(route.steps[0].instruction);
     refreshBuses();
     startCompass();   // needs this tap: iPhones only ask for compass access from a button press
+    keepAwake(true);
 });
 
 function startNav(route) {
@@ -794,6 +796,7 @@ function secondsLeft(along, remaining) {
 }
 
 function arrive() {
+    keepAwake(false);
     setMode("arrived");
     nav = null;
     $("turn-arrow").textContent = "🏁";
@@ -860,6 +863,25 @@ function onOrientation(e) {
     compass = (facing + (screen.orientation?.angle ?? 0)) % 360;   // allow for the phone held sideways
     youMarker?.setRotation(compass);
 }
+
+// ---- Keep the screen on while navigating: a locked phone stops sending the page its location ----
+let wakeLock = null;
+
+async function keepAwake(on) {
+    try {
+        if (on && !wakeLock) {
+            wakeLock = await navigator.wakeLock.request("screen");
+            wakeLock.addEventListener("release", () => (wakeLock = null));   // also happens when you switch apps
+        } else if (!on && wakeLock) {
+            await wakeLock.release();
+        }
+    } catch {}   // not supported, or refused (e.g. battery saver): the screen may still lock
+}
+
+// switching apps drops the lock; take it again when you come back mid-trip
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && mode === "nav") keepAwake(true);
+});
 
 // ---- Voice ----
 $("voice").addEventListener("click", () => {
