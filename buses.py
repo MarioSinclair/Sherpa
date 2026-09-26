@@ -14,7 +14,8 @@ RELAY = "https://bus.gatech.edu/Services/JSONPRelay.svc"
 API_KEY = "8882812681"
 
 ROUTES_TTL = 24 * 3600   # route shapes and stops barely change
-LIVE_TTL = 30            # vehicles and arrival predictions: refresh every 30 s (demo)
+VEHICLES_TTL = 3         # bus positions: GT's feed moves each bus about every 4 s
+ARRIVALS_TTL = 30        # arrival predictions, for planning bus trips
 SAMPLE_M = 5             # route lines are sampled every 5 m to place stops along them
 STOP_NEAR_M = 20         # a stop sits on the line where the bus passes within this distance
 
@@ -116,12 +117,12 @@ class Routes:
 
 
 def vehicles():
-    return _get("GetMapVehiclePoints", LIVE_TTL, isPublicMap="true")
+    return _get("GetMapVehiclePoints", VEHICLES_TTL, isPublicMap="true")
 
 
 def arrivals(route_ids):
     """{route_stop_id: [seconds until each upcoming bus, ...]} from the live predictions."""
-    data = _get("GetStopArrivalTimes", LIVE_TTL, routeIds=",".join(map(str, sorted(route_ids))), version="2")
+    data = _get("GetStopArrivalTimes", ARRIVALS_TTL, routeIds=",".join(map(str, sorted(route_ids))), version="2")
     out = {}
     for entry in data:
         secs = sorted(t["Seconds"] for t in entry.get("Times") or [] if t.get("Seconds") is not None)

@@ -62,7 +62,7 @@ const loaded = new Set();
 // the route groups drawn for each preview option
 const OPTION_LAYERS = { access: ["access-casing", "access"], safe: ["safe-casing", "safe"], shortest: ["shortest"],
     bus: ["bus-walk", "bus-ride-casing", "bus-ride"] };
-const BUS_REFRESH_MS = 30000;   // live buses: every 30 s is plenty for the demo
+const BUS_REFRESH_MS = 3000;    // live buses: GT's feed moves each bus about every 4 s
 const busMarkers = new Map();
 
 function setMode(next) {
