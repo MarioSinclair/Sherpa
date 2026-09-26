@@ -668,6 +668,7 @@ $("start").addEventListener("click", () => {
     startNav(route);
     speak(route.steps[0].instruction);
     refreshBuses();
+    startCompass();   // needs this tap: iPhones only ask for compass access from a button press
 });
 
 function startNav(route) {
@@ -808,7 +809,7 @@ function arrive() {
 // Camera: zoomed in, tilted, map rotated so the direction of travel points up,
 // with you in the lower part of the screen so you can see what's ahead.
 function moveCamera(at) {
-    youMarker?.setRotation(heading);
+    youMarker?.setRotation(compass ?? heading);
     if (!following) return;
     map.easeTo({
         center: toLngLat(at),
@@ -833,6 +834,32 @@ $("recenter").addEventListener("click", () => {
     $("recenter").hidden = true;
     if (here) moveCamera(here);
 });
+
+// ---- Compass: the cone on your dot turns with the phone, so you can see which way you're facing ----
+// (the map itself keeps following the route; it would be dizzying if it spun with every hand movement)
+let compass = null;   // degrees clockwise from north, once the phone reports one
+let compassOn = false;
+
+function startCompass() {
+    if (compassOn) return;
+    compassOn = true;
+    const listen = () => {
+        window.addEventListener("deviceorientationabsolute", onOrientation);   // Android
+        window.addEventListener("deviceorientation", onOrientation);           // iPhone (webkitCompassHeading)
+    };
+    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+        DeviceOrientationEvent.requestPermission().then((state) => state === "granted" && listen(), () => {});
+    } else {
+        listen();
+    }
+}
+
+function onOrientation(e) {
+    const facing = e.webkitCompassHeading ?? (e.absolute && e.alpha != null ? 360 - e.alpha : null);
+    if (facing == null) return;   // no compass, only relative tilt
+    compass = (facing + (screen.orientation?.angle ?? 0)) % 360;   // allow for the phone held sideways
+    youMarker?.setRotation(compass);
+}
 
 // ---- Voice ----
 $("voice").addEventListener("click", () => {
