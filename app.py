@@ -575,9 +575,9 @@ def route():
 # the main route follows what they chose: well lit and/or step-free, or else just the shortest walk
 MAIN_WEIGHT = {(True, True): "cost_access", (True, False): "short_access", (False, True): "cost", (False, False): "length"}
 
-# Lighting matters, but so does distance: a lit route this much longer than the shortest (or, on short trips,
-# this many metres longer) is recomputed with lighting counting for less
-MAX_DETOUR = 1.5
+# Lighting matters, but so does distance: a lit route (or door) at most this much longer than the shortest (or, on
+# short trips, this many metres longer); past that, lighting counts for less
+MAX_DETOUR = 2.0
 DETOUR_SLACK_M = 150
 
 
@@ -617,9 +617,10 @@ def plan_walks(orig, targets, accessible, lit, avoid, added, building):
     if not doors:
         return jsonify(error="That point is too far from campus paths"), 400
 
-    # the door: the one whose main route is the shortest walk, so a door across the building never costs minutes;
-    # a door only reachable past a closed or reported path (or, step-free, stairs) loses to one that isn't
-    _, paths = nx.single_source_dijkstra(G, orig, weight=cost(weight, avoid))
+    # the door: the one the main route reaches best (so better lit, when lighting is on), unless that's a detour past
+    # MAX_DETOUR of the nearest door's route (Skiles from Clough: 5 minutes, not 12); a door only reachable past a
+    # closed or reported path (or, step-free, stairs) loses to one that isn't
+    best, paths = nx.single_source_dijkstra(G, orig, weight=cost(weight, avoid))
 
     def walk(nodes):   # (has a problem it can't avoid, metres)
         problem, metres = False, 0.0
@@ -632,7 +633,11 @@ def plan_walks(orig, targets, accessible, lit, avoid, added, building):
     reached = [node for node in doors if node in paths]
     if not reached:
         return jsonify(error="No walking route between those points"), 404
-    dest = min(reached, key=lambda node: walk(paths[node]))
+    walks = {node: walk(paths[node]) for node in reached}
+    clean = [node for node in reached if not walks[node][0]] or reached
+    nearest_m = min(walks[node][1] for node in clean)
+    within = [node for node in clean if walks[node][1] <= max(nearest_m * MAX_DETOUR, nearest_m + DETOUR_SLACK_M)]
+    dest = min(within, key=lambda node: best[node])
     if dest == orig:
         return jsonify(error="You're already there"), 400
 
