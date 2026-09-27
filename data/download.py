@@ -14,7 +14,10 @@ LAYERS = {
 PAGE = 1000   # the sidewalk layer pages at 1,000 features, the others at 2,000
 
 # ---- Scoring settings ----
-W_DARK = 5             # a fully dark edge costs up to 6x its length...
+W_DARK = 1             # a gentle preference for brighter paths among well-lit ones...
+W_DIM = 8              # ...and a strong one against dim paths: at or under DIM_BELOW lit, a path costs 9x+ its length
+LIT_ENOUGH = 0.7       # from here up a path counts as well lit
+DIM_BELOW = 0.6        # at or under this it's dim (the penalty ramps up between the two)
 W_NO_CALLBOX = 1       # ...plus up to 1x more with no call box nearby
 CALLBOX_FULL_M = 75    # call box within this distance → full credit
 CALLBOX_NONE_M = 250   # farther than this → no credit
@@ -217,14 +220,16 @@ def mapping(lights, sidewalks, callboxes):
     checked = edges["osmid"].map(lambda ids: any(i in CHECKED_STEP_FREE for i in (ids if isinstance(ids, list) else [ids])))
     edges.loc[checked, "access"] = "yes"
 
-    risk = W_DARK * (1 - edges["light"]) + W_NO_CALLBOX * (1 - edges["callbox"])
+    dim = ((LIT_ENOUGH - edges["light"]) / (LIT_ENOUGH - DIM_BELOW)).clip(0, 1)
+    edges["dark_risk"] = W_DARK * (1 - edges["light"]) + W_DIM * dim
+    risk = edges["dark_risk"] + W_NO_CALLBOX * (1 - edges["callbox"])
     closed = edges["closed"].map({True: BLOCKED, False: 1})
     edges["cost"] = edges["length"] * (1 + risk) * closed                       # everyone
     edges["cost_access"] = edges["cost"] * edges["access"].map(ACCESS_FACTOR)   # ♿ accessible routing
     edges["short_access"] = edges["length"] * closed * edges["access"].map(ACCESS_FACTOR)   # step-free, lighting not wanted
 
     attrs = edges.set_index(["u", "v", "key"])
-    for col in ["light", "callbox", "access", "closed", "stairs", "cost", "cost_access", "short_access"]:
+    for col in ["light", "callbox", "dark_risk", "access", "closed", "stairs", "cost", "cost_access", "short_access"]:
         nx.set_edge_attributes(G, attrs[col].to_dict(), col)
     return G
 

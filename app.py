@@ -18,7 +18,7 @@ from shapely.ops import substring
 
 import buses
 import assistant
-from data.download import ACCESS_FACTOR, BLOCKED, W_DARK, W_NO_CALLBOX, load_buildings, load_layers, mapping, path
+from data.download import ACCESS_FACTOR, BLOCKED, W_NO_CALLBOX, load_buildings, load_layers, mapping, path
 
 load_dotenv()   # API keys from .env when running locally
 if not os.environ.get(assistant.key_name()):
@@ -588,7 +588,7 @@ def path_m(nodes):
 def lit_weight(scale, accessible, avoid):
     """The usual lit-route cost, with darkness counting `scale` times as much."""
     def weight(u, v, edges):
-        return min(d["length"] * (1 + scale * W_DARK * (1 - d["light"]) + W_NO_CALLBOX * (1 - d["callbox"]))
+        return min(d["length"] * (1 + scale * d["dark_risk"] + W_NO_CALLBOX * (1 - d["callbox"]))
                    * (BLOCKED if d["closed"] else 1) * (ACCESS_FACTOR[d["access"]] if accessible else 1)
                    * (BLOCKED if (u, v, k) in avoid else 1) for k, d in edges.items())
     return weight
