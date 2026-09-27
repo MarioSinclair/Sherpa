@@ -218,6 +218,13 @@ section.block h2 { font-size: clamp(30px, 4vw, 46px); letter-spacing: -0.01em; }
 .center-block h2 { text-wrap: balance; }
 .center-block p { color: var(--muted); font-size: 18px; margin: 16px 0 28px; }
 
+/* Standing with Nepal: a quiet awareness section with outside links */
+section.nepal { border-top: 1px solid var(--line); }
+.nepal p { max-width: 62ch; color: var(--muted); font-size: 18px; margin-top: 16px; }
+.nepal-links { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 18px; }
+.nepal .nepal-note { font-size: 14px; margin-top: 0; }
+.nepal-note a { color: var(--ink); }
+
 /* Scroll route — a quiet campus-shuttle line connecting hero to the final CTA */
 .route-scene { position: relative; isolation: isolate; }
 .route-layer { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: visible; }
