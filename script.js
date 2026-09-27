@@ -565,11 +565,13 @@ async function getRoute(from, to, { reroute = false } = {}) {
     routing = true;
     try {
         const where = to.building ? `building=${encodeURIComponent(to.building)}` : `to=${to.lat},${to.lng}${to.exact ? "&exact=1" : ""}`;
-        const res = await api(`/route?from=${from.lat},${from.lng}&${where}&accessible=${accessible ? 1 : 0}&lit=${lit ? 1 : 0}&avoid=${avoidParam()}`);
+        const avoiding = avoidSpots();
+        const res = await api(`/route?from=${from.lat},${from.lng}&${where}&accessible=${accessible ? 1 : 0}&lit=${lit ? 1 : 0}&avoid=${avoidParam(avoiding)}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         if (!target) return;   // user cancelled while we were waiting
         await mapReady;
+        plannedAround = new Set(avoiding.map((s) => s.id));
 
         routes = data;
         const main = data[mainOption(data)];
@@ -725,6 +727,7 @@ $("end").addEventListener("click", () => clearTrip());
 function clearTrip({ keepStatus = false } = {}) {
     [start, dest].forEach((m) => m && m.remove());
     start = dest = destName = target = doorKind = tripFrom = routes = nav = null;
+    plannedAround = new Set();
     selected = preferred = "safe";
     offRouteCount = 0;
     alerted.clear();
@@ -765,10 +768,15 @@ $("start").addEventListener("click", () => {
     keepAwake(true);
 });
 
-function startNav(route) {
-    const line = route.line.map(([lat, lng]) => ({ lat, lng }));
+function cumulative(line) {   // distance along the line at each point
     const cum = [0];
     for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + distance(line[i - 1], line[i]));
+    return cum;
+}
+
+function startNav(route) {
+    const line = route.line.map(([lat, lng]) => ({ lat, lng }));
+    const cum = cumulative(line);
 
     // Re-measure each step along this line: the server's distances follow path edges and skip
     // the short hops between a path and a bus stop, which would put "Board" a few metres early
@@ -829,14 +837,11 @@ function updateProgress() {
     else offRouteCount = 0;
 
     // (no automatic rerouting on bus trips: a walking reroute would drop the bus)
+    if (!nav.bus && !routing && newlyBlocking(nav.line, nav.cum, snap.along)) {
+        return reroute("Going around a reported problem");   // right away: never walk someone past it
+    }
     if (!nav.bus && offRouteCount >= OFF_ROUTE_FIXES && !routing && Date.now() - lastReroute > REROUTE_GAP_MS) {
-        lastReroute = Date.now();
-        offRouteCount = 0;
-        $("turn-arrow").replaceChildren(icon("refresh-cw"));
-        $("turn-distance").textContent = "Rerouting…";
-        $("turn-text").textContent = "Finding a new safe route";
-        getRoute(here, { ...lngLatToPoint(dest.getLngLat()), exact: true }, { reroute: true });   // same door
-        return;
+        return reroute("Finding a new safe route");
     }
 
     // Point the map along the route while we're on it
@@ -885,6 +890,15 @@ function secondsLeft(along, remaining) {
     }
     const toBus = Math.max((bus.dueAt - Date.now()) / 1000, (bus.boardAt - along) / walkSpeed());
     return toBus + bus.rideS + walkAfter;
+}
+
+function reroute(text) {
+    lastReroute = Date.now();
+    offRouteCount = 0;
+    $("turn-arrow").replaceChildren(icon("refresh-cw"));
+    $("turn-distance").textContent = "Rerouting…";
+    $("turn-text").textContent = text;
+    getRoute(here, { ...lngLatToPoint(dest.getLngLat()), exact: true }, { reroute: true });   // same door
 }
 
 function arrive() {
@@ -1209,11 +1223,12 @@ $("gtpd-call").addEventListener("click", () => $("gtpd-dialog").close());
 // Anyone signed in can report a problem; a second person reporting the same thing nearby confirms it.
 // Confirmed blocked paths and safety concerns are routed around until they expire.
 const REPORT_KINDS = {
-    blocked: { label: "Path blocked", icon: "construction", hours: 7 * 24, avoidM: 15 },
+    blocked: { label: "Path blocked", icon: "construction", hours: 7 * 24, avoidM: 15, avoidAt: 2 },
     barrier: { label: "Accessibility barrier", icon: "accessibility", hours: 7 * 24 },
     light: { label: "Light out", icon: "lightbulb-off", hours: 7 * 24 },
-    safety: { label: "Safety concern", icon: "triangle-alert", hours: 1, avoidM: 50 },
+    safety: { label: "Safety concern", icon: "triangle-alert", hours: 1, avoidM: 50, avoidAt: 1 },
 };
+// avoidM: routes keep this far away once avoidAt people have reported it (a safety concern from the first report)
 const SAME_SPOT_M = 30;          // same kind of report this close together = the same problem
 const REPORTS_REFRESH_MS = 60000;
 
@@ -1268,11 +1283,30 @@ function reportSpots() {
         .map((s) => ({ ...s, confirmed: s.seen.size >= 2 }));
 }
 
-// Confirmed blocked paths and safety concerns for /route: "lat,lng,radius;..."
-const avoidParam = () => reportSpots()
-    .filter((s) => s.confirmed && REPORT_KINDS[s.category].avoidM)
-    .map((s) => `${s.lat.toFixed(5)},${s.lng.toFixed(5)},${REPORT_KINDS[s.category].avoidM}`)
-    .join(";");
+// The spots routes go around: active safety concerns, and blocked paths once a second person confirms them
+const avoidSpots = () => reportSpots().filter((s) => REPORT_KINDS[s.category].avoidM && s.seen.size >= REPORT_KINDS[s.category].avoidAt);
+const avoidParam = (spots) => spots.map((s) => `${s.lat.toFixed(5)},${s.lng.toFixed(5)},${REPORT_KINDS[s.category].avoidM}`).join(";");
+let plannedAround = new Set();   // the spots the route on screen was planned around
+
+// A spot to avoid that was reported after the route was planned, on the part still ahead: plan again. (One the
+// route was planned around but still passes has no way around; the route says so.)
+function newlyBlocking(line, cum, fromAlong = 0) {
+    return avoidSpots().some((s) => {
+        if (plannedAround.has(s.id)) return false;
+        const hit = snapToLine(s, line, cum);
+        return hit.dist <= REPORT_KINDS[s.category].avoidM && hit.along >= fromAlong;
+    });
+}
+
+// Previewing: any route in the card that now passes such a spot is planned again
+function replanIfBlocked() {
+    if (mode !== "preview" || routing || !routes) return;
+    const lines = shown.filter((o) => o !== "bus").map((o) => routes[o].line.map(([lat, lng]) => ({ lat, lng })));
+    if (lines.some((line) => newlyBlocking(line, cumulative(line)))) {
+        statusEl.textContent = "Just reported on this route: finding another way…";
+        getRoute(tripStart(), target);
+    }
+}
 
 function drawReports() {
     reportMarkers.splice(0).forEach((m) => m.remove());
@@ -1288,6 +1322,7 @@ function drawReports() {
         });
         reportMarkers.push(new maplibregl.Marker({ element: el }).setLngLat([spot.lng, spot.lat]).addTo(map));
     }
+    replanIfBlocked();
 }
 
 function showReport(spot) {
