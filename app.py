@@ -135,6 +135,15 @@ ada_geojson["features"] = [f for f in ada_geojson["features"]
                            if (round(f["geometry"]["coordinates"][0], 6), round(f["geometry"]["coordinates"][1], 6)) not in stair_doors]
 
 
+NEAR_M = 60   # "near <building>" in the unsafe text: the closest footprint this close
+
+
+def near_building(x, y):
+    """The building whose footprint is closest to (x, y), within NEAR_M, or None."""
+    hit = footprints.sindex.nearest(Point(x, y), max_distance=NEAR_M, return_all=False)[1]
+    return footprints.index[hit[0]] if len(hit) else None
+
+
 def building_at(x, y):
     """The building whose footprint holds (x, y), or None."""
     hit = footprints.sindex.query(Point(x, y), predicate="intersects")
@@ -508,6 +517,18 @@ def bus_vehicles():
     } for v in buses.vehicles()])
 
 
+@app.get("/near")
+def near():
+    """The building nearest lat,lng (?at=lat,lng), for naming places in the "I feel unsafe" text."""
+    if not signed_in():
+        return jsonify(error="Please sign in"), 401
+    try:
+        x, y = parse_point(request.args["at"])
+    except (KeyError, ValueError):
+        return jsonify(error="Use /near?at=lat,lng"), 400
+    return jsonify(building=near_building(x, y))
+
+
 @app.get("/ada-entrances")
 def ada_entrances():
     """GT's ADA entrances for the map, minus the ones only stairs lead to."""
@@ -567,7 +588,8 @@ def route():
     with route_lock:
         added = []
         try:
-            return plan_walks(orig, targets, accessible, lit, set(parse_avoid(request.args.get("avoid"))), added, building)
+            return plan_walks(orig, targets, accessible, lit, set(parse_avoid(request.args.get("avoid"))), added, building,
+                              near_building(x1, y1))
         finally:
             G.remove_nodes_from(added)
 
@@ -604,7 +626,7 @@ def rein_in(nodes, shortest, accessible, avoid):
     return nodes
 
 
-def plan_walks(orig, targets, accessible, lit, avoid, added, building):
+def plan_walks(orig, targets, accessible, lit, avoid, added, building, start_near):
     """The safest and shortest walks (plus the step-free one and a bus trip when they apply) to the best door."""
     weight = MAIN_WEIGHT[(accessible, lit)]
     speed = ACCESSIBLE_SPEED if accessible else WALK_SPEED
@@ -661,7 +683,7 @@ def plan_walks(orig, targets, accessible, lit, avoid, added, building):
     x, y, kind = doors[dest]
     lat, lng = to_latlng((x, y))
     return jsonify(safe=safe_route, shortest=short_route, access=access_route, bus=bus,
-                   accessible=accessible, building=building, door={"lat": lat, "lng": lng, "kind": kind})
+                   accessible=accessible, building=building, door={"lat": lat, "lng": lng, "kind": kind}, start_near=start_near)
 
 
 if __name__ == "__main__":

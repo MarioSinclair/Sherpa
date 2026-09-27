@@ -40,6 +40,7 @@ let dest = null;          // destination marker
 let destName = null;      // the building (or tapped entrance) being walked to
 let target = null;        // what was asked for: { building } or { lat, lng }; the server picks the door
 let doorKind = null;      // where the route ends: "step-free" or "door" (an entrance), "wall" (no door on record), "point"
+let tripFrom = null;      // where the trip started: { lat, lng, name } (name: the nearest building, if any)
 let routes = null;        // last /route response
 let selected = "safe";    // which option in the preview card: "access", "safe", "shortest" or "bus"
 let shown = [];           // the options in the preview card, most relevant first
@@ -376,6 +377,25 @@ function onFix(pos) {
     youMarker.setLngLat(toLngLat(here));
 
     if (mode === "nav") updateProgress();
+    nameHere();
+}
+
+// The building you're near, for the "I feel unsafe" text: looked up again once you've moved (not on every fix)
+const NAME_MOVE_M = 25;
+const NAME_EVERY_MS = 10000;
+let hereName = null;
+let namedAt = null;   // { lat, lng, time } of the last lookup
+
+async function nameHere() {
+    if ((sb && !user) || !gpsUsable()) return;
+    if (namedAt && (Date.now() - namedAt.time < NAME_EVERY_MS || distance(namedAt, here) < NAME_MOVE_M)) return;
+    namedAt = { ...here, time: Date.now() };
+    try {
+        const res = await api(`/near?at=${here.lat},${here.lng}`);
+        if (res.ok) hereName = (await res.json()).building;
+    } catch {
+        // keep the last name; the map link is exact anyway
+    }
 }
 
 function onFixError(err) {
@@ -566,6 +586,7 @@ async function getRoute(from, to, { reroute = false } = {}) {
         }
 
         showDoor(data);
+        tripFrom = { ...from, name: data.start_near };
         setSource("shortest", data.shortest.geojson);
         setSource("bus-walk", data.bus ? data.bus.walk_geojson : EMPTY);
         setSource("bus-ride", data.bus ? data.bus.ride_geojson : EMPTY);
@@ -703,7 +724,7 @@ $("end").addEventListener("click", () => clearTrip());
 
 function clearTrip({ keepStatus = false } = {}) {
     [start, dest].forEach((m) => m && m.remove());
-    start = dest = destName = target = doorKind = routes = nav = null;
+    start = dest = destName = target = doorKind = tripFrom = routes = nav = null;
     selected = preferred = "safe";
     offRouteCount = 0;
     alerted.clear();
@@ -1135,22 +1156,29 @@ $("signout").addEventListener("click", () => {
 
 function textContact(to) {
     const phone = to.phone.replace(/[^\d+]/g, "");
-    openLink(`sms:${phone}?&body=${encodeURIComponent(alertMessage())}`);   // "?&body=" works on iPhone and Android
+    const text = alertMessage();
+    openLink(`sms:${phone}?&body=${encodeURIComponent(text)}`);   // "?&body=" works on iPhone and Android
     $("unsafe-title").textContent = `Texting ${to.name}`;
+    $("unsafe-text").textContent = text;   // so they can see what their contact gets
     if (!$("unsafe-dialog").open) $("unsafe-dialog").showModal();
 }
 
-// Where you are, your trip and how far along it, and the time
+// Where you are, your trip (start, destination, how far along) and the time; places named after the nearest
+// GT building, with a map link for the exact spot
 function alertMessage() {
     const time = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    const lines = [`I feel unsafe and want you to know where I am (${time}, sent from Sherpa).`];
-    lines.push(here ? `I'm here: ${mapLink(here)}` : "My phone couldn't get my location.");
-    if (dest && (mode === "nav" || mode === "preview")) {
-        lines.push(`Walking from: ${mapLink(mode === "nav" ? nav.line[0] : tripStart())}`,
-            `Walking to: ${destName ?? "a spot on the map"} ${mapLink(lngLatToPoint(dest.getLngLat()))}`);
+    const place = (name, p) => [name && `near ${name}`, mapLink(p)].filter(Boolean).join("\n  ");
+    const nearHere = here && namedAt && distance(namedAt, here) < 60 ? hereName : null;   // never a stale name
+    const lines = [`I feel unsafe (${time}, sent from Sherpa).`];
+    lines.push(here ? `Right now: ${place(nearHere, here)}` : "Right now: my phone couldn't get my location.");
+    if (dest && tripFrom && ["preview", "nav", "arrived"].includes(mode)) {
+        lines.push(`${mode === "preview" ? "Starting from" : "Started at"}: ${place(tripFrom.name, tripFrom)}`,
+            `${mode === "arrived" ? "Arrived at" : "Going to"}: ${[destName, mapLink(lngLatToPoint(dest.getLngLat()))].filter(Boolean).join("\n  ")}`);
         if (mode === "nav" && nav.along != null) {
-            lines.push(`I'm ${Math.round((100 * nav.along) / nav.total)}% of the way there, ${formatDist(nav.total - nav.along)} to go.`);
+            lines.push(`${Math.round((100 * nav.along) / nav.total)}% of the way there, ${formatDist(nav.total - nav.along)} to go.`);
         }
+    } else {
+        lines.push("Not on a Sherpa route right now.");
     }
     return lines.join("\n");
 }

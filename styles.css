@@ -593,6 +593,19 @@ dialog p {
     color: var(--muted);
 }
 
+/* the "I feel unsafe" text, as sent */
+dialog p.sent-text {
+    max-height: 35vh;
+    overflow-y: auto;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 dialog label {
     display: block;
     margin-bottom: 12px;

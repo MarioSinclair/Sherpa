@@ -178,7 +178,8 @@
     <!-- After "I feel unsafe": the app can't see whether the text was actually sent -->
     <dialog id="unsafe-dialog">
         <h2 id="unsafe-title"></h2>
-        <p>Press send in your texting app. The message has your location, your trip and the time.</p>
+        <p>Press send in your texting app. This is the message:</p>
+        <p id="unsafe-text" class="sent-text"></p>
         <div class="stack">
             <button id="unsafe-again" class="secondary">Send again</button>
             <button id="unsafe-gtpd" class="danger"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg>Call GTPD</button>
