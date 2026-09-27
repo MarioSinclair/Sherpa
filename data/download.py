@@ -15,7 +15,7 @@ PAGE = 1000   # the sidewalk layer pages at 1,000 features, the others at 2,000
 
 # ---- Scoring settings ----
 W_DARK = 1             # a gentle preference for brighter paths among well-lit ones...
-W_DIM = 8              # ...and a strong one against dim paths: at or under DIM_BELOW lit, a path costs 9x+ its length
+W_DIM = 15             # ...and a strong one against dim paths: at or under DIM_BELOW lit, a path costs 16x+ its length
 LIT_ENOUGH = 0.65      # from here up a path counts as well lit
 DIM_BELOW = 0.6        # at or under this it's dim (the penalty ramps up between the two)
 W_NO_CALLBOX = 1       # ...plus up to 1x more with no call box nearby
