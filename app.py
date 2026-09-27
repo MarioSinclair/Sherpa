@@ -18,7 +18,7 @@ from shapely.ops import substring
 
 import buses
 import assistant
-from data.download import ACCESS_FACTOR, BLOCKED, load_buildings, load_layers, mapping, path
+from data.download import ACCESS_FACTOR, BLOCKED, W_DARK, W_NO_CALLBOX, load_buildings, load_layers, mapping, path
 
 load_dotenv()   # API keys from .env when running locally
 if not os.environ.get(assistant.key_name()):
@@ -575,6 +575,34 @@ def route():
 # the main route follows what they chose: well lit and/or step-free, or else just the shortest walk
 MAIN_WEIGHT = {(True, True): "cost_access", (True, False): "short_access", (False, True): "cost", (False, False): "length"}
 
+# Lighting matters, but so does distance: a lit route this much longer than the shortest (or, on short trips,
+# this many metres longer) is recomputed with lighting counting for less
+MAX_DETOUR = 1.5
+DETOUR_SLACK_M = 150
+
+
+def path_m(nodes):
+    return sum(min(e["length"] for e in G[u][v].values()) for u, v in zip(nodes, nodes[1:]))
+
+
+def lit_weight(scale, accessible, avoid):
+    """The usual lit-route cost, with darkness counting `scale` times as much."""
+    def weight(u, v, edges):
+        return min(d["length"] * (1 + scale * W_DARK * (1 - d["light"]) + W_NO_CALLBOX * (1 - d["callbox"]))
+                   * (BLOCKED if d["closed"] else 1) * (ACCESS_FACTOR[d["access"]] if accessible else 1)
+                   * (BLOCKED if (u, v, k) in avoid else 1) for k, d in edges.items())
+    return weight
+
+
+def rein_in(nodes, shortest, accessible, avoid):
+    """A lit route far longer than the shortest walk (`shortest`, same start and end) is lit less strictly."""
+    limit = max(path_m(shortest) * MAX_DETOUR, path_m(shortest) + DETOUR_SLACK_M)
+    for scale in (0.5, 0.25, 0.1):
+        if path_m(nodes) <= limit:
+            break
+        nodes = nx.shortest_path(G, nodes[0], nodes[-1], weight=lit_weight(scale, accessible, avoid))
+    return nodes
+
 
 def plan_walks(orig, targets, accessible, lit, avoid, added, building):
     """The safest and shortest walks (plus the step-free one and a bus trip when they apply) to the best door."""
@@ -609,8 +637,12 @@ def plan_walks(orig, targets, accessible, lit, avoid, added, building):
         return jsonify(error="You're already there"), 400
 
     main = paths[dest]
-    safe = main if weight == "cost" else ox.shortest_path(G, orig, dest, weight=cost("cost", avoid))
     short = main if weight == "length" else ox.shortest_path(G, orig, dest, weight=cost("length", avoid))
+    safe = rein_in(main if weight == "cost" else ox.shortest_path(G, orig, dest, weight=cost("cost", avoid)), short, False, avoid)
+    if weight == "cost":
+        main = safe
+    elif weight == "cost_access":   # step-free and lit: kept within reach of the shortest step-free walk
+        main = rein_in(main, ox.shortest_path(G, orig, dest, weight=cost("short_access", avoid)), True, avoid)
     safe_route = route_summary(safe, "cost", avoid)
     short_route = route_summary(short, "length", avoid)
     access_route = route_summary(main, weight, avoid) if accessible else None

@@ -14,7 +14,7 @@ LAYERS = {
 PAGE = 1000   # the sidewalk layer pages at 1,000 features, the others at 2,000
 
 # ---- Scoring settings ----
-W_DARK = 3             # a fully dark edge costs up to 4x its length...
+W_DARK = 5             # a fully dark edge costs up to 6x its length...
 W_NO_CALLBOX = 1       # ...plus up to 1x more with no call box nearby
 CALLBOX_FULL_M = 75    # call box within this distance → full credit
 CALLBOX_NONE_M = 250   # farther than this → no credit
