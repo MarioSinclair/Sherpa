@@ -89,7 +89,7 @@ function idleHint() {
 // ---- Map layers ----
 const EMPTY = { type: "FeatureCollection", features: [] };
 // route colour by light: dim (red, amber) → well lit (green); Sherpa's colours, as in styles.css
-const LIGHT_COLOR = ["interpolate", ["linear"], ["get", "light"], 0, "#B3261E", 0.6, "#E8A33D", 0.7, "#2F7D5B"];   // dim at 60%, lit from 70%, as in data/download.py
+const LIGHT_COLOR = ["interpolate", ["linear"], ["get", "light"], 0, "#B3261E", 0.6, "#E8A33D", 0.65, "#2F7D5B"];   // dim at 60%, lit from 65%, as in data/download.py
 // GT "Close" statuses edited longer ago than this are stale and ignored, as in data/download.py
 const CLOSED_RECENT_DAYS = 30;
 
